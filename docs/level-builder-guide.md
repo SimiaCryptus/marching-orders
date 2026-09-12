@@ -248,11 +248,19 @@ player may place come from `budget.signs`.
 | `rifle` | `range = rules.rifleRange` (8), `attack = rules.rifleAttack` (3), cooldown 1.0 s — ranged troops out-duel sentries and shoot turrets off walls |
 | `pickaxe` | `canDig = true`, `digUses = rules.pickaxeCharges` (10 voxels); consumed, then the slot frees up |
 | `ladder` | `ladders = rules.ladderCharges` (3 segments) for climbing walls ≥ 2 high |
+| `medic` | `rules.medicCharges` (6) heals of `rules.medicHeal` (4) HP, applied automatically to the nearest wounded troop of its team within `rules.medicRange` (3) cells, every `rules.medicCooldown` (1.5 s) |
+| `grenade` | `rules.grenadeCharges` (3) grenades lobbed at hostiles between `rules.grenadeMinRange` (2) and `rules.grenadeRange` (6) cells with line of sight: `rules.grenadeAttack` (6) damage over `rules.grenadeSplash` (1.5) cells, every `rules.grenadeCooldown` (3 s); they hurt enemy troops *and* guards |
+| `armor` | absorbs `rules.armorMitigation` (50 %) of every hit until `rules.armorPool` (20 — twice a troop's HP) damage has been soaked up, then it is discarded |
+| `parachute` | survives `rules.parachuteCharges` (3) falls beyond `lethalFall`, and floats down at half speed |
 
 A crate serves the first `capacity` troops of its team (`capacity` defaults to
-`rules.crateCapacity`, 5). One equipment slot per troop. Place crates on the walking lane so
-the column crosses them without steering, or *off* the lane to make the player route a
-detachment there with signs.
+`rules.crateCapacity`, 5). A troop has **one exclusive equipment slot plus any number of
+stackable kits**: whether a kind takes the slot is the level rule `rules.<kind>Exclusive`
+(everything is exclusive by default except `armor` and `parachute`), and a crate can override
+it with `"exclusive": false` / `true`. Effects combine — an armoured rifleman with a parachute is
+a legitimate build — and a consumable kit frees its slot when it runs out. A troop never takes a
+kind it already carries. Place crates on the walking lane so the column crosses them without
+steering, or *off* the lane to make the player route a detachment there with signs.
 
 ### 6.7 Roles (`budget.roles`)
 
@@ -277,6 +285,9 @@ hostiles = #guards + #enemySpawners
 crates.pickaxe = max(1, ceil(nWalls / 2))
 crates.ladder  = nWalls > 0 ? 1 : 0
 crates.rifle   = hostiles > 0 ? 1 + floor(hostiles / 3) : 0
+crates.medic   = hostiles >= 3 ? 1 : 0
+crates.grenade = keepGuards >= 3 ? 1 : 0
+crates.armor   = difficulty >= 5 ? 1 : 0
 
 signs.blocker  = 2 + #enemySpawners          // to wall off a crossing pod
 signs.arrow    = 2 * #spikeFields + (difficulty < 5 ? 2 : 1)
@@ -298,11 +309,14 @@ becomes `arrow: 2`).
 "rules": { "enemyTroopHp": 13, "guardHpScale": 1.15, "rifleRange": 8 }
 ```
 
-All twelve keys (see the table in `src/rules.js` / `level.d.ts`) are optional; missing keys use
-the default, out-of-range values are clamped, integer-stepped keys are rounded. Use `rules` to
-change *difficulty* without changing *terrain*: bumping `enemyTroopHp` and `guardHpScale` with
-difficulty is exactly what the parametric builder does
-(`enemyTroopHp = 10 + difficulty`, `guardHpScale = 1 + 0.05 * difficulty`).
+Every key (see the table in `src/rules.js` / `level.d.ts`) is optional; missing keys use the
+default, out-of-range values are clamped, integer-stepped keys are rounded, and the
+`<kind>Exclusive` flags are booleans. Besides troop and guard stats the block configures every
+kit: rifle range/damage, pickaxe and ladder charges, the medic's charges/heal/range/cooldown,
+the grenade band/damage/splash/cooldown, armor pool and mitigation, parachute charges, and
+which kits are exclusive. Use `rules` to change *difficulty* without changing *terrain*:
+bumping `enemyTroopHp` and `guardHpScale` with difficulty is exactly what the parametric
+builder does (`enemyTroopHp = 10 + difficulty`, `guardHpScale = 1 + 0.05 * difficulty`).
 
 ---
 
@@ -377,6 +391,13 @@ Garrison posts, filled in order so a small garrison is just the gate:
 10. Spike gaps are off the spawn lane and the player owns enough `arrow`/`forward` signs to
     reach them.
 11. `description` names the obstacles, the hostiles and the win condition.
+12. Run the level tool: `node scripts/level-tool.mjs levels/my-level.json`. It enforces
+     `level.d.ts` strictly (unknown properties, wrong types, non-axis-aligned facings and unknown
+     kinds are errors, not silent drops), performs checks 1–9 above (placement, support, shared
+     cells, standable objective, winnable count, reachability with and without the granted
+     tools) and writes isometric and top-down thumbnails to `thumbnails/`. `--strict` makes
+     warnings fatal, `--campaign` covers the generated progression, `--json` gives a
+     machine-readable report for agents.
 
 ### Reachability BFS (movement-graph approximation)
 

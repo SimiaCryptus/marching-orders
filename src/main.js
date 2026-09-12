@@ -19,15 +19,17 @@ const DEFAULT_LEVEL_URL = new URL('./levels/tutorial-outpost.json', import.meta.
 
 const MODE = Object.freeze({ PLAY: 'play', EDIT: 'edit' });
 
-/** Player palette: crates, then signs, then roles — hotkeys 1..9 in that order. */
+/** Player palette: crates, then signs, then roles — hotkeys along the number row (1..9, 0, -, =) in that order. */
+const HOTKEYS = '1234567890-=';
 const TOOLS = [
   ...Object.entries(EQUIPMENT).map(([key, def]) => ({ id: `crate:${key}`, kind: 'crate', key, label: def.label, color: def.color })),
   ...Object.entries(SIGNS).map(([key, def]) => ({ id: `sign:${key}`, kind: 'sign', key, label: def.label, color: def.color })),
   ...Object.entries(ROLES).map(([key, role]) => ({ id: `role:${key}`, kind: 'role', key, label: role.label, color: role.color })),
-].map((t, i) => ({ ...t, hotkey: String((i + 1) % 10) }));
+].map((t, i) => ({ ...t, hotkey: HOTKEYS[i] ?? null }));
+const HOTKEY_RANGE = `${TOOLS[0].hotkey}…${TOOLS.filter((t) => t.hotkey).pop().hotkey}`;
 
 const DEFAULT_HINT =
-   `Pick a tool (1-${TOOLS.length}), then click the map — even through a crowd. Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ` +
+    `Pick a tool (${HOTKEY_RANGE}), then click the map — even through a crowd. Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ` +
    'right-click or shift-click a placed sign to pick it up. V resets the view, E opens the level designer, C starts the campaign.';
 
 /**
@@ -354,7 +356,7 @@ class Game {
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return;
     if (e && e.shiftKey) { this.pickUpSign(hit); return; }
     if (!this.tool) {
-      this.hud.showToast(`Select a tool first (keys 1-${TOOLS.length}). Right-click or shift-click a sign to pick it up.`, 2000);
+       this.hud.showToast(`Select a tool first (keys ${HOTKEY_RANGE}). Right-click or shift-click a sign to pick it up.`, 2000);
       return;
     }
     const cell = this.floorCellFromHit(hit);
@@ -429,7 +431,7 @@ class Game {
       if (e.code === 'KeyV') this.renderer.resetView();
       return;
     }
-    const tool = TOOLS.find((t) => t.hotkey === e.key);
+     const tool = TOOLS.find((t) => t.hotkey && t.hotkey === e.key);
     if (tool) { this.selectTool(this.tool && this.tool.id === tool.id ? null : tool.id); return; }
     switch (e.code) {
       case 'Escape': this.selectTool(null); break;

@@ -1,7 +1,9 @@
-Pluggable generators:
+implement a "bridge" crate similar to ladder but meant for gaps
+right-clicking a builder should deactivate them, allowing reactivation later. this allows the builder's charges to be controlled.
+parameterize enemy speed and size
+add mud tiles (reduced movement speed)
+update the level generation spec/schema/prompts as appropriate to the current codebase
+draft but do not implement a number of ideas for levels (at least 10)
+new level generator: maze. terrain is a maze with walls, traps, and mud. enemies have compatible patrols programmed into the maze
 
-    Enhance the interface for level generation so that [level-builder.js](src/world/level-builder.js) is merely the first reference implementation for an expandable library of generators
-    these generators should be easily added to the code base as a single file and a single line into a manifest dictionary
-    the parameters exposed by a generator should be communicated dynamically and supported by the level builder ui appropriately
-    provide a markdown document noting how to add a new generator with a typescript-based interface contract
 

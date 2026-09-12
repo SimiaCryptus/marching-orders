@@ -82,7 +82,7 @@ export class Hud {
       name.textContent = tool.label;
       const count = el('span', 'count');
       const key = el('span', 'count');
-      key.textContent = `[${tool.hotkey}]`;
+       key.textContent = tool.hotkey ? `[${tool.hotkey}]` : '';
       btn.append(swatch, name, count, key);
       btn.addEventListener('click', () => handlers.onSelectTool(tool.id));
       btn.dataset.count = '';

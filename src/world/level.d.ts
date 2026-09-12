@@ -49,7 +49,7 @@ export type GuardType = 'sentry' | 'turret' | 'grenadier';
 export type SignKind = 'blocker' | 'arrow' | 'fan' | 'forward';
 /** Accepted on input and rewritten by the loader: turnLeft|turnRight|turn -> arrow, fanOut|divert -> fan. */
 export type LegacySignKind = 'turnLeft' | 'turnRight' | 'turn' | 'fanOut' | 'divert';
-export type EquipmentKind = 'rifle' | 'pickaxe' | 'ladder';
+export type EquipmentKind = 'rifle' | 'pickaxe' | 'ladder' | 'medic' | 'grenade' | 'armor' | 'parachute';
 export type RoleName = 'builder';
 
 // ---------------------------------------------------------------------------------------
@@ -66,9 +66,33 @@ export interface Rules {
   /** def 10, 1..999 voxels */     pickaxeCharges: number;
   /** def 3, 1..99 segments */     ladderCharges: number;
   /** def 5, 1..99 troops */       crateCapacity: number;
+   /** def 6, 1..99 heals */        medicCharges: number;
+   /** def 4, 1..99 HP per heal */  medicHeal: number;
+   /** def 3, 1..16 cells */        medicRange: number;
+   /** def 1.5, 0.1..10 s */        medicCooldown: number;
+   /** def 3, 1..99 grenades */     grenadeCharges: number;
+   /** def 6, 2..16 cells */        grenadeRange: number;
+   /** def 2, 0..8 cells */         grenadeMinRange: number;
+   /** def 6, 0..99 */              grenadeAttack: number;
+   /** def 1.5, 0.5..5 cells */     grenadeSplash: number;
+   /** def 3, 0.5..10 s */          grenadeCooldown: number;
+   /** def 20, 1..999 damage */     armorPool: number;
+   /** def 0.5, 0.05..1 */          armorMitigation: number;
+   /** def 3, 1..99 falls */        parachuteCharges: number;
   /** def 1, 0.1..10 */            guardHpScale: number;
   /** def 1, 0.1..10 */            guardDamageScale: number;
   /** def 1, 0.1..4 */             guardRangeScale: number;
+   /**
+    * Whether a kit takes the troop's single equipment slot (true) or stacks on top of anything
+    * it already carries (false). Defaults: everything exclusive except armor and parachute.
+    */
+   rifleExclusive: boolean;
+   pickaxeExclusive: boolean;
+   ladderExclusive: boolean;
+   medicExclusive: boolean;
+   grenadeExclusive: boolean;
+   armorExclusive: boolean;
+   parachuteExclusive: boolean;
 }
 
 export type RulesInput = Partial<Rules>;
@@ -140,6 +164,8 @@ export interface CratePlacement {
   team: Team;
   /** Integer > 0. Omit to use `rules.crateCapacity`. */
   capacity?: number;
+   /** Overrides `rules.<kind>Exclusive` for this crate only. Omit to follow the rule. */
+   exclusive?: boolean;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -242,7 +268,7 @@ export interface Level {
   guards: Guard[];
   enemySpawners: EnemySpawner[];
   signs: Required<SignPlacement> extends infer _ ? Array<{ kind: SignKind; pos: Vec3; dir: Facing; team: Team }> : never;
-  crates: Array<{ kind: EquipmentKind; pos: Vec3; team: Team; capacity?: number }>;
+   crates: Array<{ kind: EquipmentKind; pos: Vec3; team: Team; capacity?: number; exclusive?: boolean }>;
   voxels?: VoxelBlob;
   fills?: Fill[];
   generator?: GeneratorParams;

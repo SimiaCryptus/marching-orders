@@ -1,0 +1,15 @@
+{
+  "name": "marching-orders",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A Lemmings-inspired voxel siege game for the browser, plus level tooling.",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve .",
+    "levels": "node scripts/level-tool.mjs levels --campaign",
+    "levels:check": "node scripts/level-tool.mjs levels --no-render --strict"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

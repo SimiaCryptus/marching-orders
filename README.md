@@ -47,7 +47,14 @@ the clock does.
    column wherever the two meet.
   it will automatically pick up — rifles, pickaxes, ladders. Equipping troops
   this way permanently changes what they can do (dig through walls, climb
-  vertical faces, fight at range).
+   vertical faces, fight at range). Support kits round the toolbox out: a
+   **medic** kit heals wounded comrades in range automatically, **grenades**
+   are lobbed at anything hostile in a band ahead, **armor** soaks up half of
+   every hit until it is spent, and a **parachute** turns a fatal drop into a
+   soft landing. Most kits take a troop's single equipment slot, but armor and
+   parachutes stack on top of whatever it already carries — and every number
+   behind them (charges, ranges, mitigation, which kits stack) is a per-level
+   rule.
 - **Roles.** A handful of troops can be pulled aside and given a special job —
   such as becoming a builder who constructs stairways, changing how the whole
   group can move through the level.
@@ -79,6 +86,12 @@ standard progression of twelve levels that ramps up in length and
 difficulty. Press **C** (or open `?campaign=N`) to play it; after a win the
 end card offers the next level (**N**). Any campaign level can be loaded
 into the designer, tweaked and shared like a hand-made one.
+For hand-authored or machine-generated levels there is also a **command-line
+level tool** (`node scripts/level-tool.mjs levels/`, Node 18+, no dependencies):
+it validates level JSON strictly against the documented schema, checks that
+every entity stands somewhere sensible and that the vault is reachable with the
+tools the level hands out, and prerenders isometric and top-down PNG thumbnails
+of every level (and of the campaign with `--campaign`).
 
 
 ## Where this idea comes from

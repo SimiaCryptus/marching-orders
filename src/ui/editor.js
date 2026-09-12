@@ -1,7 +1,7 @@
 import { VOXEL, VOXEL_TYPES } from '../world/voxel.js';
 import { Simulation } from '../simulation.js';
 import { GUARD_TYPES } from '../units/guard.js';
-import { EQUIPMENT } from '../items/equipment.js';
+import { EQUIPMENT, isExclusive } from '../items/equipment.js';
 import { SIGNS, describeSign } from '../items/sign.js';
 import { ROLES } from '../units/roles/index.js';
 import { TEAM, TEAM_LABELS, otherTeam } from '../units/team.js';
@@ -562,12 +562,22 @@ export class Editor {
      rulesBlock.append(field('Lethal fall (voxels)', f.lethalFall));
     f.timeLimit = numberInput({ min: 0, max: 3600 }, (v) => { this.level.timeLimit = v; });
      rulesBlock.append(field('Time limit (s, 0 = none)', f.timeLimit));
-     // Tunable stats (rules.js): hit points, charges, ranges, crate capacity, guard scaling.
+      // Tunable stats (rules.js), one block per group: hit points, kits, guard scaling, exclusivity flags.
      f.rules = {};
+      const ruleBlocks = { Rules: rulesBlock };
      for (const r of RULE_DEFS) {
-       const i = numberInput({ min: r.min, max: r.max, step: r.step }, (v) => { this.level.rules[r.key] = v; });
+        const g = r.group || 'Rules';
+        if (!ruleBlocks[g]) ruleBlocks[g] = block(rulesCols, g);
+        let i;
+        if (r.type === 'boolean') {
+          i = el('input');
+          i.type = 'checkbox';
+          i.addEventListener('change', () => { this.level.rules[r.key] = i.checked; });
+        } else {
+          i = numberInput({ min: r.min, max: r.max, step: r.step }, (v) => { this.level.rules[r.key] = v; });
+        }
        f.rules[r.key] = i;
-       rulesBlock.append(field(r.label, i));
+        ruleBlocks[g].append(field(r.label, i));
      }
 
     f.budget = { crates: {}, signs: {}, roles: {} };
@@ -760,7 +770,10 @@ export class Editor {
     f.required.value = String(L.objective.required);
     f.lethalFall.value = String(L.lethalFall);
     f.timeLimit.value = String(L.timeLimit);
-     for (const r of RULE_DEFS) f.rules[r.key].value = String(L.rules[r.key]);
+     for (const r of RULE_DEFS) {
+       if (r.type === 'boolean') f.rules[r.key].checked = !!L.rules[r.key];
+       else f.rules[r.key].value = String(L.rules[r.key]);
+     }
     for (const k of Object.keys(f.budget.crates)) f.budget.crates[k].value = String(L.budget.crates[k] ?? 0);
     for (const k of Object.keys(f.budget.signs)) f.budget.signs[k].value = String(L.budget.signs[k] ?? 0);
     for (const k of Object.keys(f.budget.roles)) f.budget.roles[k].value = String(L.budget.roles[k] ?? 0);
@@ -1180,7 +1193,8 @@ export class Editor {
           this.setHint(`Remove the ${team} ${t.label} at ${c}`);
         } else {
           const verb = cr || this.signAt(target) ? 'Replace with' : 'Drop';
-           this.setHint(`${verb} a ${team} ${t.label} at ${c} — the first ${this.level.rules.crateCapacity} ${team} troops over it take its contents`);
+           const stack = isExclusive(t.key, this.level.rules) ? '' : ' (stackable: even equipped troops take it)';
+           this.setHint(`${verb} a ${team} ${t.label} at ${c} — the first ${this.level.rules.crateCapacity} ${team} troops over it take its contents${stack}`);
         }
         break;
       }

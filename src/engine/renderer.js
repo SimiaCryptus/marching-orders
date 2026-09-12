@@ -238,7 +238,11 @@ export class Renderer {
      this.signPreview = null;
      this.signPreviewKey = '';
     this.projectileGeometry = new THREE.SphereGeometry(0.13, 8, 6);
-    this.projectileMaterial = new THREE.MeshLambertMaterial({ color: 0x2a2f38, emissive: 0x552200 });
+     // Grenades: dark with an orange fuse for the enemy, olive with a green fuse for the player.
+     this.projectileMaterials = {
+       [TEAM.ENEMY]: new THREE.MeshLambertMaterial({ color: 0x2a2f38, emissive: 0x552200 }),
+       [TEAM.PLAYER]: new THREE.MeshLambertMaterial({ color: 0x2f3a2a, emissive: 0x1f5a22 }),
+     };
     this.projectileMeshes = new Map();
 
     this.particles = new Particles(3000);
@@ -411,12 +415,13 @@ export class Renderer {
 
   syncUnits(sim) {
     this.troops.update(sim.troops, (t, color) => {
+       const kit = t.displayKit;
       if (t.team === TEAM.ENEMY) {
         // Enemy troops stay recognisably red; equipment only tints them.
         color.setHex(TEAM_COLORS.enemy);
-        if (t.equipment) color.lerp(this.tmpColor.setHex(EQUIPMENT[t.equipment].color), 0.45);
+         if (kit) color.lerp(this.tmpColor.setHex(EQUIPMENT[kit].color), 0.45);
       } else {
-        color.setHex(t.role ? t.role.color : t.equipment ? EQUIPMENT[t.equipment].color : TEAM_COLORS.player);
+         color.setHex(t.role ? t.role.color : kit ? EQUIPMENT[kit].color : TEAM_COLORS.player);
       }
       if (t.flash > 0) color.lerp(WHITE, t.flash * 0.8);
     });
@@ -608,7 +613,8 @@ export class Renderer {
       seen.add(p.id);
       let mesh = this.projectileMeshes.get(p.id);
       if (!mesh) {
-        mesh = new THREE.Mesh(this.projectileGeometry, this.projectileMaterial);
+         const material = this.projectileMaterials[p.team === TEAM.ENEMY ? TEAM.ENEMY : TEAM.PLAYER];
+         mesh = new THREE.Mesh(this.projectileGeometry, material);
         mesh.castShadow = true;
         this.dynamic.add(mesh);
         this.projectileMeshes.set(p.id, mesh);
@@ -635,6 +641,8 @@ export class Renderer {
         case 'saved': this.particles.burst(ev.pos, 0xffe066, 18, 3); break;
         case 'spawn': this.particles.burst(ev.pos, ev.team === TEAM.ENEMY ? 0xff8a6a : 0x8fd3ff, 8, 2); break;
         case 'land': this.particles.burst(ev.pos, 0x9a8a70, 5, 1.5); break;
+         case 'heal': this.particles.burst(ev.pos, 0x7cffb0, 8, 1.5); break;
+         case 'parachute': this.particles.burst(ev.pos, 0xffffff, 14, 2); break;
         case 'explosion':
           this.particles.burst(ev.pos, 0xff8a3c, 40, 5);
           this.particles.burst(ev.pos, 0x444444, 14, 2.5);

@@ -85,6 +85,8 @@ export function build(p) {
       pickaxe: p.cover > 25 ? 2 : 1,
       ladder: p.hazard === 'pits' ? 2 : 1,
       rifle: p.rifles ? 1 + Math.floor(guards.length / 3) : 0,
+       medic: guards.length >= 2 ? 1 : 0,
+       armor: p.hazard !== 'none' ? 1 : 0,
     },
     signs: { blocker: 1, arrow: 2 + (nHazards ? 2 : 0), fan: 1, forward: 1 },
     roles: { builder: 1 },

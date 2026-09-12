@@ -18,9 +18,11 @@ export const TROOP_STATE = Object.freeze({
 });
 
 const FALL_SPEED = 7; // voxels per second
+const PARACHUTE_FALL_SPEED = 3; // voxels per second under a canopy
 const DIG_TIME = 0.6; // seconds per soft voxel
 const LADDER_TIME = 0.7; // seconds per ladder segment
 const CLIMB_SPEED = 0.8; // fraction of walking speed
+const GRENADE_MUZZLE = 0.8; // height above the feet a troop lobs a grenade from
 
 /**
  * Base troop: a brawler that marches, turns, steps and falls. Equipment (crates) and
@@ -28,9 +30,12 @@ const CLIMB_SPEED = 0.8; // fraction of walking speed
  * with interpolation so the simulation stays on the grid while rendering is smooth.
  * Troops belong to a team: player troops fight guards and enemy troops, enemy troops fight
  * player troops, and each team only follows its own signs and crates.
+ *
+ * Equipment: one exclusive slot (`equipment`) plus any number of stackable kits; `kits` lists
+ * everything carried. Effects stay applied until a consumable kit is used up (see removeKit).
  */
 export class Troop {
-   constructor(id, x, y, z, dir, team = TEAM.PLAYER, rules = DEFAULT_RULES) {
+  constructor(id, x, y, z, dir, team = TEAM.PLAYER, rules = DEFAULT_RULES) {
     this.id = id;
     this.team = team;
     this.cell = { x, y, z };
@@ -40,24 +45,43 @@ export class Troop {
     this.moveSpeed = 0;
     this.state = TROOP_STATE.WALKING;
 
-     // §2.2 stats — base values come from the level's rules (rules.js)
-     const hp = team === TEAM.ENEMY ? rules.enemyTroopHp : rules.troopHp;
-     this.maxHp = hp;
-     this.hp = hp;
+    // §2.2 stats — base values come from the level's rules (rules.js)
+    const hp = team === TEAM.ENEMY ? rules.enemyTroopHp : rules.troopHp;
+    this.maxHp = hp;
+    this.hp = hp;
     this.armor = 0;
-     this.speed = rules.troopSpeed;
-     this.attack = rules.troopAttack;
+    this.speed = rules.troopSpeed;
+    this.attack = rules.troopAttack;
     this.range = 1;
     this.attackCooldown = 0.8;
     this.morale = 100;
     this.attackTimer = 0;
 
-    // equipment
-    this.equipment = null;
+    // equipment (items/equipment.js)
+    this.equipment = null; // kind in the exclusive slot
+    this.kits = [];        // every kind carried, in pickup order
     this.canDig = false;
     this.digUses = 0;
     this.digTimer = 0;
     this.ladders = 0;
+    // medic kit
+    this.healCharges = 0;
+    this.healAmount = 0;
+    this.healRange = 0;
+    this.healCooldown = 1;
+    this.healTimer = 0;
+    // grenades
+    this.grenades = 0;
+    this.grenadeRange = 0;
+    this.grenadeMinRange = 0;
+    this.grenadeAttack = 0;
+    this.grenadeSplash = 1;
+    this.grenadeCooldown = 1;
+    this.grenadeTimer = 0;
+    // armor / parachute
+    this.armorPool = 0;
+    this.armorMitigation = 0;
+    this.parachutes = 0;
 
     // role
     this.role = null;
@@ -75,6 +99,27 @@ export class Troop {
     return DIRS[this.dir];
   }
 
+  /** The kit that colours the troop: the exclusive one, else the last stackable one picked up. */
+  get displayKit() {
+    return this.equipment ?? (this.kits.length ? this.kits[this.kits.length - 1] : null);
+  }
+
+  hasKit(kind) {
+    return this.kits.includes(kind);
+  }
+
+  addKit(kind, exclusive) {
+    if (exclusive) this.equipment = kind;
+    if (!this.kits.includes(kind)) this.kits.push(kind);
+  }
+
+  /** A kit is dropped when it is used up (pickaxe worn out, last ladder placed, ...). */
+  removeKit(kind) {
+    const i = this.kits.indexOf(kind);
+    if (i >= 0) this.kits.splice(i, 1);
+    if (this.equipment === kind) this.equipment = null;
+  }
+
   snapToCell() {
     this.pos.x = this.cell.x + 0.5;
     this.pos.y = this.cell.y;
@@ -85,6 +130,8 @@ export class Troop {
     if (!this.alive) return;
     this.flash = Math.max(0, this.flash - dt * 4);
     if (this.attackTimer > 0) this.attackTimer -= dt;
+    if (this.grenadeTimer > 0) this.grenadeTimer -= dt;
+    if (this.healCharges > 0) this.tryHeal(dt, sim); // medics patch up the column while marching
 
     if (this.target) {
       this.advance(dt, sim);
@@ -112,7 +159,8 @@ export class Troop {
   beginFall(sim) {
     if (this.role) this.clearRole(sim);
     this.state = TROOP_STATE.FALLING;
-    this.setTarget({ x: this.cell.x, y: this.cell.y - 1, z: this.cell.z }, FALL_SPEED);
+    const speed = this.parachutes > 0 ? PARACHUTE_FALL_SPEED : FALL_SPEED;
+    this.setTarget({ x: this.cell.x, y: this.cell.y - 1, z: this.cell.z }, speed);
   }
 
   advance(dt, sim) {
@@ -144,7 +192,16 @@ export class Troop {
     if (!supported(world, x, y, z)) return; // still airborne, next tick keeps falling
 
     if (wasFalling) {
-      if (this.fallDistance > sim.lethalFall) { this.die(sim, 'fall'); return; }
+      if (this.fallDistance > sim.lethalFall) {
+        if (this.parachutes > 0) {
+          // The canopy takes the impact instead of the troop.
+          sim.events.push({ type: 'parachute', pos: { ...this.pos } });
+          if (--this.parachutes <= 0) { this.parachutes = 0; this.removeKit('parachute'); }
+        } else {
+          this.die(sim, 'fall');
+          return;
+        }
+      }
       sim.events.push({ type: 'land', pos: { ...this.pos } });
       this.state = TROOP_STATE.WALKING;
     }
@@ -184,8 +241,9 @@ export class Troop {
           this.digTimer = 0;
           sim.digVoxel(step.target);
           if (--this.digUses <= 0) {
+            this.digUses = 0;
             this.canDig = false;
-            this.equipment = null; // pickaxe worn out
+            this.removeKit('pickaxe'); // pickaxe worn out
           }
         }
         break;
@@ -203,7 +261,7 @@ export class Troop {
           if (sim.world.get(c.x, c.y, c.z) === VOXEL.AIR) sim.placeVoxel(c, VOXEL.LADDER); // foot of the ladder
           if (--this.ladders <= 0) {
             this.ladders = 0;
-            this.equipment = null; // ladder kit used up
+            this.removeKit('ladder'); // ladder kit used up
           }
         }
         break;
@@ -221,6 +279,7 @@ export class Troop {
 
   /** Returns true when the troop is busy fighting this tick. */
   tryCombat(dt, sim) {
+    if (this.tryGrenade(sim)) return true;
     const target = sim.findHostileInRange(this);
     if (!target) {
       if (this.state === TROOP_STATE.FIGHTING || this.state === TROOP_STATE.SHOOTING) this.state = TROOP_STATE.WALKING;
@@ -243,8 +302,39 @@ export class Troop {
     return true;
   }
 
+  /** Lob a grenade at the nearest hostile inside the grenade band (beyond the minimum range, in sight). */
+  tryGrenade(sim) {
+    if (this.grenades <= 0 || this.grenadeTimer > 0) return false;
+    const target = sim.findHostileInRange(this, this.grenadeRange, this.grenadeMinRange);
+    if (!target) return false;
+    this.grenadeTimer = this.grenadeCooldown;
+    this.state = TROOP_STATE.SHOOTING;
+    sim.throwGrenade(this, target.cell, this.grenadeAttack, this.grenadeSplash, GRENADE_MUZZLE);
+    if (--this.grenades <= 0) { this.grenades = 0; this.removeKit('grenade'); }
+    return true;
+  }
+
+  /** Medic kit: heal the nearest wounded troop of the team (itself included) within range. */
+  tryHeal(dt, sim) {
+    this.healTimer -= dt;
+    if (this.healTimer > 0) return;
+    const wounded = sim.findWoundedNear(this, this.healRange);
+    if (!wounded) return;
+    this.healTimer = this.healCooldown;
+    wounded.hp = Math.min(wounded.maxHp, wounded.hp + this.healAmount);
+    sim.events.push({ type: 'heal', pos: { x: wounded.pos.x, y: wounded.pos.y + 0.6, z: wounded.pos.z } });
+    if (--this.healCharges <= 0) { this.healCharges = 0; this.removeKit('medic'); }
+  }
+
   takeDamage(amount, sim) {
-    const dmg = Math.max(1, amount - this.armor);
+    let dmg = Math.max(1, amount - this.armor);
+    if (this.armorPool > 0) {
+      // Armor soaks up a share of every hit until its pool is spent, then it is discarded.
+      const absorbed = Math.min(this.armorPool, dmg * this.armorMitigation);
+      this.armorPool -= absorbed;
+      dmg -= absorbed;
+      if (this.armorPool <= 1e-6) { this.armorPool = 0; this.removeKit('armor'); }
+    }
     this.hp -= dmg;
     this.flash = 1;
     sim.events.push({ type: 'hit', pos: { x: this.pos.x, y: this.pos.y + 0.5, z: this.pos.z } });

@@ -120,6 +120,7 @@ export function normalizeLevel(raw) {
         .map((c) => {
           const out = { kind: c.kind, pos: c.pos, team: normalizeTeam(c.team) };
           if (isInt(c.capacity) && c.capacity > 0) out.capacity = c.capacity;
+           if (typeof c.exclusive === 'boolean') out.exclusive = c.exclusive; // overrides rules.<kind>Exclusive
           return out;
         })
     : [];
@@ -207,7 +208,7 @@ export function newBlankLevel(w = 32, h = 12, d = 12) {
       required: 5,
     },
     budget: {
-      crates: { rifle: 1, pickaxe: 1, ladder: 1 },
+       crates: { rifle: 1, pickaxe: 1, ladder: 1, medic: 1, grenade: 1, armor: 1, parachute: 1 },
        signs: { blocker: 2, arrow: 2, fan: 1, forward: 1 },
       roles: { builder: 2 },
     },

@@ -15,8 +15,8 @@
     #hud-top h1 { margin: 0 0 6px; font-size: 16px; letter-spacing: 0.5px; }
     #hud-top .stat { display: flex; justify-content: space-between; gap: 12px; line-height: 1.5; }
      #hud-controls { top: 12px; right: 12px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 60vw; }
-    #hud-palette { bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; }
-     .tool { display: flex; flex-direction: column; align-items: center; min-width: 78px; padding: 6px 8px; border-radius: 6px; border: 2px solid transparent; background: rgba(255, 255, 255, 0.06); cursor: pointer; color: inherit; font: inherit; font-size: 13px; }
+     #hud-palette { bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px); }
+      .tool { display: flex; flex-direction: column; align-items: center; min-width: 66px; padding: 6px 8px; border-radius: 6px; border: 2px solid transparent; background: rgba(255, 255, 255, 0.06); cursor: pointer; color: inherit; font: inherit; font-size: 13px; }
     .tool .swatch { width: 22px; height: 22px; border-radius: 4px; margin-bottom: 4px; }
     .tool .count { font-size: 12px; opacity: 0.75; }
     .tool.active { border-color: #ffd75a; background: rgba(255, 215, 90, 0.15); }

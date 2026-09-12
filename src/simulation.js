@@ -1,7 +1,7 @@
 import { Troop, TROOP_STATE } from './units/troop.js';
 import { Guard } from './units/guard.js';
 import { Crate } from './items/crate.js';
-import { EQUIPMENT } from './items/equipment.js';
+import { EQUIPMENT, isExclusive } from './items/equipment.js';
 import { Sign, SIGNS } from './items/sign.js';
 import { ROLES } from './units/roles/index.js';
 import { TEAM } from './units/team.js';
@@ -75,7 +75,10 @@ export class Simulation {
     for (const c of level.crates || []) {
       const def = EQUIPMENT[c.kind];
       if (!def) continue;
-       this.crates.push(new Crate(this.nextId++, c.kind, c.pos[0], c.pos[1], c.pos[2], c.capacity ?? this.rules.crateCapacity, c.team));
+       this.crates.push(new Crate(
+         this.nextId++, c.kind, c.pos[0], c.pos[1], c.pos[2],
+         c.capacity ?? this.rules.crateCapacity, c.team, c.exclusive ?? null,
+       ));
     }
   }
 
@@ -170,8 +173,9 @@ export class Simulation {
    * Nearest hostile unit a troop can hit: adjacent for melee; anything within range and line of
    * sight for ranged troops (so riflemen return fire on turrets shooting at them from any side).
    * Player troops fight guards and enemy troops; enemy troops fight player troops.
+    * `range` / `minRange` default to the troop's weapon; grenades pass their own band.
    */
-  findHostileInRange(troop) {
+   findHostileInRange(troop, range = troop.range, minRange = 0) {
     const c = troop.cell;
     let best = null;
     let bestDist = Infinity;
@@ -181,19 +185,34 @@ export class Simulation {
       let dist;
       if (manhattan <= 1 && Math.abs(dy) <= 1) {
         dist = manhattan;
-      } else if (troop.range > 1) {
+       } else if (range > 1) {
         dist = Math.hypot(dx, dy, dz);
-        if (dist > troop.range || dist >= bestDist) return;
+         if (dist > range || dist >= bestDist) return;
         if (!this.hasLOS(c, u.cell)) return;
       } else {
         return;
       }
+       if (dist < minRange) return;
       if (dist < bestDist) { bestDist = dist; best = u; }
     };
     if (troop.team === TEAM.PLAYER) for (const g of this.guards) if (g.alive) consider(g);
     for (const t of this.troops) if (t.alive && t.team !== troop.team) consider(t);
     return best;
   }
+   /** Nearest troop of the medic's team (itself included) within `range` cells that is below full health. */
+   findWoundedNear(medic, range) {
+     let best = null;
+     let bestDist = Infinity;
+     for (const t of this.troops) {
+       if (!t.alive || t.team !== medic.team || t.hp >= t.maxHp) continue;
+       const dist = Math.hypot(t.cell.x - medic.cell.x, t.cell.y - medic.cell.y, t.cell.z - medic.cell.z);
+       if (dist > range || dist >= bestDist) continue;
+       best = t;
+       bestDist = dist;
+     }
+     return best;
+   }
+
 
   findTroopNear(guard, reach, team = TEAM.PLAYER) {
     for (const t of this.troops) {
@@ -259,22 +278,25 @@ export class Simulation {
 
   // ---- projectiles --------------------------------------------------------------
 
-  /** A grenadier lobs a grenade on a parabolic arc; it explodes on arrival (idea.md §6 Physics). */
-  throwGrenade(guard, targetCell) {
-    const from = { x: guard.pos.x, y: guard.pos.y + (guard.def.muzzle ?? 1), z: guard.pos.z };
+   /**
+    * A grenadier guard or a troop with a grenade crate lobs a grenade on a parabolic arc; it
+    * explodes on arrival with `damage` over `radius` against everything not on the thrower's team.
+    */
+   throwGrenade(thrower, targetCell, damage, radius = 1, muzzle = 1) {
+     const from = { x: thrower.pos.x, y: thrower.pos.y + muzzle, z: thrower.pos.z };
     const to = { x: targetCell.x + 0.5, y: targetCell.y, z: targetCell.z + 0.5 };
     const dist = Math.hypot(to.x - from.x, to.z - from.z);
     this.projectiles.push({
       id: this.nextId++,
       kind: 'grenade',
-      team: guard.team,
+       team: thrower.team,
       from,
       to,
       t: 0,
       duration: 0.4 + dist * 0.1,
       height: 1 + dist * 0.2,
-       damage: guard.rangedAttack,
-      radius: guard.def.splash ?? 1,
+       damage,
+       radius,
       pos: { ...from },
     });
   }
@@ -295,7 +317,10 @@ export class Simulation {
     this.projectiles = this.projectiles.filter((p) => !p.done);
   }
 
-  /** Area-of-effect damage to every troop not on `team` within `radius` (horizontal) of `pos`. */
+   /**
+    * Area-of-effect damage to every unit not on `team` within `radius` (horizontal) of `pos`:
+    * enemy grenades hit the player's troops, player grenades hit enemy troops and guards.
+    */
   explode(pos, damage, radius, team = TEAM.ENEMY) {
     this.events.push({ type: 'explosion', pos: { ...pos } });
     for (const t of [...this.troops]) {
@@ -304,6 +329,13 @@ export class Simulation {
       if (Math.hypot(t.pos.x - pos.x, t.pos.z - pos.z) > radius) continue;
       t.takeDamage(damage, this);
     }
+     if (team === TEAM.ENEMY) return;
+     for (const g of [...this.guards]) {
+       if (!g.alive) continue;
+       if (Math.abs(g.pos.y - pos.y) > 1.5) continue;
+       if (Math.hypot(g.pos.x - pos.x, g.pos.z - pos.z) > radius) continue;
+       this.damageUnit(g, damage);
+     }
   }
 
   // ---- combat & objective callbacks ----------------------------------------------
@@ -329,14 +361,21 @@ export class Simulation {
     this.events.push({ type: 'saved', pos: { ...troop.pos } });
   }
 
+   /**
+    * Crates hand their kit to troops of their team crossing the cell. An exclusive kit needs the
+    * troop's one equipment slot to be free; a stackable one (rules.<kind>Exclusive = false, or the
+    * crate's own flag) goes on top of anything. A troop never takes a kind it already carries.
+    */
   tryPickupCrate(troop) {
-    if (troop.equipment) return; // one equipment slot per troop
     const crate = this.crateAt(troop.cell, troop.team);
     if (!crate) return;
     const def = EQUIPMENT[crate.kind];
+     if (!def || troop.hasKit(crate.kind)) return;
+     const exclusive = isExclusive(crate.kind, this.rules, crate.exclusive);
+     if (exclusive && troop.equipment) return; // the equipment slot is taken
     crate.remaining--;
      def.apply(troop, this.rules);
-    troop.equipment = crate.kind;
+     troop.addKit(crate.kind, exclusive);
     this.events.push({ type: 'pickup', pos: { ...troop.pos }, color: def.color });
   }
 

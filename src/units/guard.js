@@ -89,7 +89,7 @@ export class Guard {
     }
     this.attackTimer = this.def.rangedCooldown ?? this.cooldown;
     if (this.def.projectile === 'grenade') {
-      sim.throwGrenade(this, target.cell);
+       sim.throwGrenade(this, target.cell, this.rangedAttack, this.def.splash ?? 1, this.def.muzzle ?? 1);
       return;
     }
      target.takeDamage(this.rangedAttack, sim);

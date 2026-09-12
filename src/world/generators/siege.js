@@ -221,6 +221,9 @@ export function build(p) {
       pickaxe: Math.max(1, Math.ceil(nWalls / 2)),
       ladder: nWalls > 0 ? 1 : 0,
       rifle: hostiles > 0 ? 1 + Math.floor(hostiles / 3) : 0,
+       medic: hostiles >= 3 ? 1 : 0,          // a garrison worth patching the column up for
+       grenade: keepGuards >= 3 ? 1 : 0,      // bunched defenders inside the keep
+       armor: p.difficulty >= 5 ? 1 : 0,      // turret pillars and crossfire from here on
     },
     signs: {
       blocker: 2 + enemySpawners.length,
