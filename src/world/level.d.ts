@@ -176,21 +176,19 @@ export interface Budget {
 }
 
 // ---------------------------------------------------------------------------------------
-// Generator metadata (written by buildParametricLevel; optional on hand-authored levels)
+// Generator metadata (written by buildLevel() in level-builder.js; optional on hand-authored levels)
 // ---------------------------------------------------------------------------------------
+/**
+  * Which generator made the level and with what parameters, so the designer can show and tweak
+  * them. `id` is the manifest key in `src/world/generators/index.js`; every other key is one of
+  * that generator's declared parameters (see `generators/generator.d.ts`). Parameters left on
+  * auto are stored as `null`. Levels written before generators were pluggable have no `id`; the
+  * loader treats those as made by the default ('siege') generator.
+  */
 
 export interface GeneratorParams {
-  seed: number;        // 0..999999
-  difficulty: number;  // 0..10
-  segments: number;    // 1..20 obstacle segments on the approach
-  depth: number;       // 10..40 corridor width (= level size z)
-  name: string;
-  /** Count parameters: `null` means "auto" (derived from difficulty/segments by autoParams). */
-  troops: number | null;      // 5..300
-  patrols: number | null;     // 0..40 enemy pods
-  enemyTroops: number | null; // 1..60 per pod
-  guards: number | null;      // 0..12 keep garrison
-  enemyCrates: number | null; // 0..40 rifle crates for the patrols
+   id: string;
+   [param: string]: number | string | boolean | null;
 }
 
 export interface CampaignTag {

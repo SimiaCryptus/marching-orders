@@ -10,8 +10,8 @@ import {
   buildWorld, exportLevel, normalizeLevel, parseLevel, stringifyLevel, newBlankLevel, encodeLevelHash,
 } from '../world/level-loader.js';
 import {
-    buildParametricLevel, buildCampaignLevel, normalizeParams, resolveParams, AUTO_PARAMS,
-    GENERATOR_LIMITS, CAMPAIGN_LENGTH,
+     buildLevel, buildCampaignLevel, getGenerator, listGenerators, normalizeParams, resolveParams,
+     DEFAULT_GENERATOR, CAMPAIGN_LENGTH,
 } from '../world/level-builder.js';
 import { RULE_DEFS } from '../rules.js';
 
@@ -39,18 +39,6 @@ const TABS = [
    ['share', 'Share'],
 ];
 
-/** Parametric builder inputs in display order; the count parameters may be left on auto. */
-const GEN_FIELDS = [
-   ['seed', 'Seed'],
-   ['difficulty', `Difficulty (${GENERATOR_LIMITS.difficulty.min}–${GENERATOR_LIMITS.difficulty.max})`],
-   ['segments', 'Obstacle segments'],
-   ['depth', 'Corridor width'],
-   ['troops', 'Player troops'],
-   ['patrols', 'Enemy pods'],
-   ['enemyTroops', 'Troops per enemy pod'],
-   ['guards', 'Keep guards'],
-   ['enemyCrates', 'Enemy rifle crates'],
-];
 
 /**
  * Editor palette. The team selector is a "paint": the Drop pod tool moves the player's pod or
@@ -304,7 +292,9 @@ export class Editor {
     this.team = TEAM.PLAYER;   // the "paint" applied by the pod / sign / crate tools
     this.facing = 0;           // DIRS index given to new signs and pods (Q / wheel rotates)
     this.enemyDefaults = { count: 10, rate: 2 };
-     this.genParams = normalizeParams({}); // parametric builder settings (Generate section)
+     this.generatorId = DEFAULT_GENERATOR; // Generate tab: the selected generator (level-builder.js) ...
+     this.genParams = {};                  // ... its normalised parameters (auto values are null) ...
+     this.genParamsById = {};              // ... and the parameters remembered per generator
     this.boxMode = false;
     this.pending = null; // first corner of a box / objective zone
     this.hover = null;
@@ -315,6 +305,7 @@ export class Editor {
      this.pages = {};       // tab id -> page element
      this.layout = null;    // floating panel geometry { x, y, w, h } in CSS px
     this.buildUI();
+     this.setGenerator(DEFAULT_GENERATOR);
      this.setLayout(this.loadLayout());
      this.selectTab(readStorage(TAB_STORAGE_KEY) || TABS[0][0]);
      window.addEventListener('resize', () => this.setLayout({}));
@@ -337,7 +328,7 @@ export class Editor {
     this.level = exportLevel(lv, this.world); // world is authoritative for voxels from now on
     this.pending = null;
     this.facing = dirIdx(lv.spawn.dir);
-     if (lv.generator) this.genParams = normalizeParams(lv.generator);
+     if (lv.generator) this.setGenerator(lv.generator.id, lv.generator); // show the generator that made it
     if (lv.enemySpawners.length) {
       this.enemyDefaults = { count: lv.enemySpawners[0].count, rate: lv.enemySpawners[0].rate };
     }
@@ -379,10 +370,20 @@ export class Editor {
   }
    /** Build a level from the Generate section's parameters (optionally overriding some) and load it. */
    generate(overrides = {}) {
-     this.genParams = normalizeParams({ ...this.genParams, ...overrides });
-     const level = buildParametricLevel(this.genParams);
+     const gen = this.generator;
+     this.genParams = normalizeParams(gen, { ...this.genParams, ...overrides });
+     this.genParamsById[gen.id] = this.genParams;
+     let level;
+     try {
+       level = buildLevel(gen, this.genParams);
+     } catch (err) {
+       console.error(err);
+       this.setStatus(`⚠ ${gen.label}: ${err.message}`);
+       this.syncGenForm();
+       return;
+     }
      this.open(level);
-     this.setStatus(`Generated "${level.name}" (${level.size.join(' × ')}) — edit it or press Play.`);
+     this.setStatus(`Generated "${level.name}" with ${gen.label} (${level.size.join(' × ')}) — edit it or press Play.`);
    }
    /** Load a level of the standard progression into the designer (0-based index). */
    loadCampaignLevel(index) {
@@ -589,25 +590,31 @@ export class Editor {
        roleBlock.append(field(`${role.label}s`, i));
     }
 
-     // ---- Generate tab: parametric builder and the campaign ----------------------------------
+     // ---- Generate tab: pluggable generators (docs/generators.md) and the campaign -------------
      const genCols = cols(P.generate);
-     const genBlock = block(genCols, 'Parametric builder');
+     const genBlock = block(genCols, 'Generator');
+     f.generator = el('select');
+     for (const g of listGenerators()) {
+       const opt = el('option');
+       opt.value = g.id;
+       opt.textContent = g.label;
+       f.generator.append(opt);
+     }
+     f.generator.addEventListener('change', () => this.setGenerator(f.generator.value));
+     genBlock.append(field('Generator', f.generator));
+     this.genDescription = el('div', 'info');
+     genBlock.append(this.genDescription);
+     // One field per declared parameter; rebuilt by setGenerator() from the generator's schema.
+     this.genFields = el('div');
+     genBlock.append(this.genFields);
      f.gen = {};
      f.genLabels = {};
-     const GL = GENERATOR_LIMITS;
-     for (const [key, label] of GEN_FIELDS) {
-       // Typing into a count field makes it explicit; "Auto counts" hands it back to the difficulty.
-       const input = numberInput({ min: GL[key].min, max: GL[key].max }, (v) => { this.genParams[key] = v; this.syncGenForm(); });
-       const row = field(label, input);
-       f.gen[key] = input;
-       f.genLabels[key] = row.firstChild;
-       genBlock.append(row);
-     }
      const genRow = el('div', 'row');
+     f.randomSeed = button('Random seed', () => this.randomSeed());
      genRow.append(
        button('Generate', () => this.generate()),
-       button('Random seed', () => this.generate({ seed: Math.floor(Math.random() * (GL.seed.max + 1)) })),
-       button('Auto counts', () => this.resetAutoParams()),
+       f.randomSeed,
+       button('Auto values', () => this.resetAutoParams()),
      );
      genBlock.append(genRow);
 
@@ -624,9 +631,9 @@ export class Editor {
      campaignBlock.append(campaignRow);
      const genInfo = el('div', 'info');
      genInfo.textContent =
-       'Builds a corridor of obstacles (walls, trenches, spike fields, turret pillars) crossed by enemy patrols ' +
-       'and ending in a guarded keep. Counts marked (auto) follow the difficulty until you type a value. ' +
-       'The same parameters always give the same level; the campaign is built this way.';
+       'Values marked (auto) are derived by the generator until you type one ("Auto values" hands them back). ' +
+       'The same generator and parameters always give the same level; the campaign is built with the Siege ' +
+       'generator. New generators: src/world/generators/ and docs/generators.md.';
      P.generate.append(genInfo);
 
      // ---- Share tab: export / import ---------------------------------------------------------
@@ -761,18 +768,96 @@ export class Editor {
     this.updateFacingInfo();
     this.updateInfo();
   }
-   /** Show the generator inputs; auto counts display their derived value and are labelled (auto). */
+   // ---- generators -----------------------------------------------------------------------
+   /** The generator selected on the Generate tab. */
+   get generator() {
+     return getGenerator(this.generatorId);
+   }
+   /**
+    * Select a generator and rebuild its parameter form from its schema. `params` seeds the form
+    * (e.g. `level.generator` of a loaded level); otherwise the values last used for it come back.
+    */
+   setGenerator(id, params) {
+     let gen;
+     try {
+       gen = getGenerator(id);
+     } catch (err) {
+       if (id !== undefined) { console.warn(err); this.setStatus(`⚠ ${err.message} — using the default generator.`); }
+       gen = getGenerator(DEFAULT_GENERATOR);
+     }
+     this.generatorId = gen.id;
+     this.genParams = normalizeParams(gen, params ?? this.genParamsById[gen.id] ?? {});
+     this.genParamsById[gen.id] = this.genParams;
+     this.f.generator.value = gen.id;
+     this.genDescription.textContent = gen.description || '';
+     this.f.randomSeed.disabled = !gen.params.some((d) => d.key === 'seed');
+     this.buildGenFields(gen);
+     this.syncGenForm();
+   }
+   /** One form control per parameter definition, by type (generator.d.ts `ParamDef`). */
+   buildGenFields(gen) {
+     const f = this.f;
+     f.gen = {};
+     f.genLabels = {};
+     this.genFields.innerHTML = '';
+     for (const def of gen.params) {
+       // Typing into an auto field makes it explicit; "Auto values" hands it back to the generator.
+       const set = (v) => { this.genParams[def.key] = v; this.syncGenForm(); };
+       let input;
+       if (def.type === 'boolean') {
+         input = el('input');
+         input.type = 'checkbox';
+         input.addEventListener('change', () => set(input.checked));
+       } else if (def.type === 'select') {
+         input = el('select');
+         for (const o of def.options) {
+           const opt = el('option');
+           opt.value = String(o.value);
+           opt.textContent = o.label ?? String(o.value);
+           input.append(opt);
+         }
+         input.addEventListener('change', () => set(input.value));
+       } else if (def.type === 'string') {
+         input = textInput(set);
+       } else {
+         input = numberInput({ min: def.min, max: def.max, step: def.step ?? (def.type === 'int' ? 1 : 'any') }, set);
+       }
+       const row = field(def.label, input);
+       if (def.help) { input.title = def.help; row.firstChild.title = def.help; }
+       f.gen[def.key] = input;
+       f.genLabels[def.key] = row.firstChild;
+       this.genFields.append(row);
+     }
+   }
+   /** Show the generator inputs; auto parameters display their derived value and are labelled (auto). */
    syncGenForm() {
-     const resolved = resolveParams(this.genParams);
-     for (const [key, label] of GEN_FIELDS) {
-       this.f.gen[key].value = String(resolved[key]);
-       const auto = AUTO_PARAMS.includes(key) && this.genParams[key] === null;
-       this.f.genLabels[key].textContent = auto ? `${label} (auto)` : label;
+     const gen = this.generator;
+     const resolved = resolveParams(gen, this.genParams);
+     for (const def of gen.params) {
+       const input = this.f.gen[def.key];
+       if (!input) continue;
+       const v = resolved[def.key];
+       if (def.type === 'boolean') {
+         input.checked = !!v;
+       } else {
+         const s = v === null || v === undefined ? '' : String(v);
+         if (input.value !== s) input.value = s; // only touch the control when needed (keeps the caret)
+       }
+       const auto = !!def.auto && this.genParams[def.key] === null;
+       this.f.genLabels[def.key].textContent = auto ? `${def.label} (auto)` : def.label;
      }
    }
    resetAutoParams() {
-     for (const k of AUTO_PARAMS) this.genParams[k] = null;
+     for (const def of this.generator.params) if (def.auto) this.genParams[def.key] = null;
      this.syncGenForm();
+   }
+   /** Generate with a fresh random seed (generators expose that as a parameter with the key `seed`). */
+   randomSeed() {
+     const gen = this.generator;
+     const def = gen.params.find((d) => d.key === 'seed');
+     if (!def) { this.setStatus(`${gen.label} has no seed parameter.`); return; }
+     const lo = def.min ?? 0, hi = def.max ?? 999999;
+     this.generate({ seed: lo + Math.floor(Math.random() * (hi - lo + 1)) });
    }
 
   updateInfo() {
