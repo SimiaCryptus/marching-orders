@@ -4,16 +4,30 @@ import { Crate } from './items/crate.js';
 import { EQUIPMENT } from './items/equipment.js';
 import { Sign, SIGNS } from './items/sign.js';
 import { ROLES } from './units/roles/index.js';
+import { TEAM } from './units/team.js';
 import { dirIndexFromVector } from './units/pathing.js';
 import { VOXEL } from './world/voxel.js';
+import { DEFAULT_RULES } from './rules.js';
 
 export const GAME_STATUS = Object.freeze({ PLAYING: 'playing', WON: 'won', LOST: 'lost' });
 
 const center = (c) => ({ x: c.x + 0.5, y: c.y + 0.5, z: c.z + 0.5 });
 
+/** A drop pod: releases `pool` troops of `team`, `rate` seconds apart, marching along `dir`. */
+function makeSpawner(sp, team) {
+  return {
+    team,
+    x: sp.pos[0], y: sp.pos[1], z: sp.pos[2],
+    dir: dirIndexFromVector(sp.dir[0], sp.dir[1]),
+    rate: sp.rate ?? 1.5,
+    pool: sp.count,
+    timer: 0.5,
+  };
+}
+
 /**
- * Deterministic game state: troops, guards, crates, signs, projectiles, budgets and the objective.
- * No randomness is used here so replays / level validation stay reproducible.
+ * Deterministic game state: troops (both teams), guards, crates, signs, projectiles, budgets and
+ * the objective. No randomness is used here so replays / level validation stay reproducible.
  */
 export class Simulation {
   constructor(world, level) {
@@ -31,20 +45,16 @@ export class Simulation {
     this.signs = [];
     this.projectiles = [];
 
-    const sp = level.spawn;
-    this.spawn = {
-      x: sp.pos[0], y: sp.pos[1], z: sp.pos[2],
-      dir: dirIndexFromVector(sp.dir[0], sp.dir[1]),
-      rate: sp.rate ?? 1.5,
-    };
-    this.pool = sp.count;
-    this.spawnTimer = 0.5;
+    this.spawn = makeSpawner(level.spawn, TEAM.PLAYER);
+    this.enemySpawners = (level.enemySpawners || []).map((sp) => makeSpawner(sp, TEAM.ENEMY));
+    this.spawners = [this.spawn, ...this.enemySpawners];
 
     this.objective = level.objective;
     this.saved = 0;
     this.lost = 0;
     this.lethalFall = level.lethalFall ?? 4;
     this.timeLimit = level.timeLimit ?? 0;
+     this.rules = level.rules || DEFAULT_RULES; // tunable stats (rules.js)
 
     this.budget = {
       crates: { ...(level.budget?.crates || {}) },
@@ -54,8 +64,30 @@ export class Simulation {
 
     for (const g of level.guards || []) {
       const dir = g.dir ? dirIndexFromVector(g.dir[0], g.dir[1]) : 2;
-      this.guards.push(new Guard(this.nextId++, g.type, g.pos[0], g.pos[1], g.pos[2], dir));
+       this.guards.push(new Guard(this.nextId++, g.type, g.pos[0], g.pos[1], g.pos[2], dir, this.rules));
     }
+    // Level-authored signs and crates (either team). Player ones behave exactly like placed ones.
+    for (const s of level.signs || []) {
+      if (!SIGNS[s.kind]) continue;
+      const dir = s.dir ? dirIndexFromVector(s.dir[0], s.dir[1]) : this.spawn.dir;
+      this.signs.push(new Sign(this.nextId++, s.kind, s.pos[0], s.pos[1], s.pos[2], dir, s.team));
+    }
+    for (const c of level.crates || []) {
+      const def = EQUIPMENT[c.kind];
+      if (!def) continue;
+       this.crates.push(new Crate(this.nextId++, c.kind, c.pos[0], c.pos[1], c.pos[2], c.capacity ?? this.rules.crateCapacity, c.team));
+    }
+  }
+
+  /** Reinforcements still waiting in the player's drop pod. */
+  get pool() {
+    return this.spawn.pool;
+  }
+
+  countTroops(team) {
+    let n = 0;
+    for (const t of this.troops) if (t.alive && t.team === team) n++;
+    return n;
   }
 
   // ---- main step ------------------------------------------------------------
@@ -64,11 +96,12 @@ export class Simulation {
     if (this.status !== GAME_STATUS.PLAYING) return;
     this.time += dt;
 
-    if (this.pool > 0) {
-      this.spawnTimer -= dt;
-      if (this.spawnTimer <= 0) {
-        this.spawnTroop();
-        this.spawnTimer += this.spawn.rate;
+    for (const sp of this.spawners) {
+      if (sp.pool <= 0) continue;
+      sp.timer -= dt;
+      if (sp.timer <= 0) {
+        this.spawnTroop(sp);
+        sp.timer += sp.rate;
       }
     }
 
@@ -83,25 +116,25 @@ export class Simulation {
     this.checkEnd();
   }
 
-  spawnTroop() {
-    const s = this.spawn;
-    const troop = new Troop(this.nextId++, s.x, s.y, s.z, s.dir);
+  spawnTroop(sp) {
+     const troop = new Troop(this.nextId++, sp.x, sp.y, sp.z, sp.dir, sp.team, this.rules);
     this.troops.push(troop);
-    this.pool--;
-    this.events.push({ type: 'spawn', pos: { ...troop.pos } });
+    sp.pool--;
+    this.events.push({ type: 'spawn', pos: { ...troop.pos }, team: sp.team });
   }
 
   // ---- spatial queries -------------------------------------------------------
 
-  /** A cell troops refuse to walk into (they turn around instead): a Blocker sign. */
-  isBlocked(c) {
-    const sign = this.signAt(c);
+  /** A cell troops of `team` refuse to walk into (they turn around instead): their Blocker sign. */
+  isBlocked(c, team = TEAM.PLAYER) {
+    const sign = this.signAt(c, team);
     return !!sign && sign.kind === 'blocker';
   }
 
-  troopAt(c) {
+  troopAt(c, team = null) {
     for (const t of this.troops) {
-      if (t.alive && t.cell.x === c.x && t.cell.y === c.y && t.cell.z === c.z) return t;
+      if (!t.alive || (team && t.team !== team)) continue;
+      if (t.cell.x === c.x && t.cell.y === c.y && t.cell.z === c.z) return t;
     }
     return null;
   }
@@ -113,15 +146,17 @@ export class Simulation {
     return null;
   }
 
-  crateAt(c) {
+  crateAt(c, team = null) {
     for (const cr of this.crates) {
-      if (!cr.depleted && cr.x === c.x && cr.y === c.y && cr.z === c.z) return cr;
+      if (cr.depleted || (team && cr.team !== team)) continue;
+      if (cr.x === c.x && cr.y === c.y && cr.z === c.z) return cr;
     }
     return null;
   }
 
-  signAt(c) {
+  signAt(c, team = null) {
     for (const s of this.signs) {
+      if (team && s.team !== team) continue;
       if (s.x === c.x && s.y === c.y && s.z === c.z) return s;
     }
     return null;
@@ -132,36 +167,37 @@ export class Simulation {
   }
 
   /**
-   * Nearest guard a troop can hit: adjacent for melee; anything within range and line of sight
-   * for ranged troops (so riflemen return fire on turrets shooting at them from any side).
+   * Nearest hostile unit a troop can hit: adjacent for melee; anything within range and line of
+   * sight for ranged troops (so riflemen return fire on turrets shooting at them from any side).
+   * Player troops fight guards and enemy troops; enemy troops fight player troops.
    */
-  findGuardInRange(troop) {
+  findHostileInRange(troop) {
     const c = troop.cell;
     let best = null;
     let bestDist = Infinity;
-    for (const g of this.guards) {
-      if (!g.alive) continue;
-      const dx = g.cell.x - c.x, dy = g.cell.y - c.y, dz = g.cell.z - c.z;
+    const consider = (u) => {
+      const dx = u.cell.x - c.x, dy = u.cell.y - c.y, dz = u.cell.z - c.z;
       const manhattan = Math.abs(dx) + Math.abs(dz);
       let dist;
       if (manhattan <= 1 && Math.abs(dy) <= 1) {
         dist = manhattan;
       } else if (troop.range > 1) {
         dist = Math.hypot(dx, dy, dz);
-        if (dist > troop.range) continue;
-        if (dist >= bestDist) continue;
-        if (!this.hasLOS(c, g.cell)) continue;
+        if (dist > troop.range || dist >= bestDist) return;
+        if (!this.hasLOS(c, u.cell)) return;
       } else {
-        continue;
+        return;
       }
-      if (dist < bestDist) { bestDist = dist; best = g; }
-    }
+      if (dist < bestDist) { bestDist = dist; best = u; }
+    };
+    if (troop.team === TEAM.PLAYER) for (const g of this.guards) if (g.alive) consider(g);
+    for (const t of this.troops) if (t.alive && t.team !== troop.team) consider(t);
     return best;
   }
 
-  findTroopNear(guard, reach) {
+  findTroopNear(guard, reach, team = TEAM.PLAYER) {
     for (const t of this.troops) {
-      if (!t.alive) continue;
+      if (!t.alive || t.team !== team) continue;
       if (Math.abs(t.cell.x - guard.cell.x) <= reach &&
           Math.abs(t.cell.z - guard.cell.z) <= reach &&
           Math.abs(t.cell.y - guard.cell.y) <= 1) return t;
@@ -169,12 +205,12 @@ export class Simulation {
     return null;
   }
 
-  /** Nearest troop a ranged guard can see within [minRange, range]. */
-  findTroopInRange(guard, range, minRange = 0) {
+  /** Nearest troop of `team` a ranged guard can see within [minRange, range]. */
+  findTroopInRange(guard, range, minRange = 0, team = TEAM.PLAYER) {
     let best = null;
     let bestDist = Infinity;
     for (const t of this.troops) {
-      if (!t.alive) continue;
+      if (!t.alive || t.team !== team) continue;
       const dx = t.cell.x - guard.cell.x, dy = t.cell.y - guard.cell.y, dz = t.cell.z - guard.cell.z;
       const dist = Math.hypot(dx, dy, dz);
       if (dist > range || dist < minRange || dist >= bestDist) continue;
@@ -231,12 +267,13 @@ export class Simulation {
     this.projectiles.push({
       id: this.nextId++,
       kind: 'grenade',
+      team: guard.team,
       from,
       to,
       t: 0,
       duration: 0.4 + dist * 0.1,
       height: 1 + dist * 0.2,
-      damage: guard.def.rangedAttack ?? guard.attack,
+       damage: guard.rangedAttack,
       radius: guard.def.splash ?? 1,
       pos: { ...from },
     });
@@ -252,17 +289,17 @@ export class Simulation {
       p.pos.y = p.from.y + (p.to.y - p.from.y) * k + p.height * 4 * k * (1 - k);
       if (k >= 1) {
         p.done = true;
-        this.explode(p.to, p.damage, p.radius);
+        this.explode(p.to, p.damage, p.radius, p.team);
       }
     }
     this.projectiles = this.projectiles.filter((p) => !p.done);
   }
 
-  /** Area-of-effect damage to every troop within `radius` (horizontal) of `pos`. */
-  explode(pos, damage, radius) {
+  /** Area-of-effect damage to every troop not on `team` within `radius` (horizontal) of `pos`. */
+  explode(pos, damage, radius, team = TEAM.ENEMY) {
     this.events.push({ type: 'explosion', pos: { ...pos } });
     for (const t of [...this.troops]) {
-      if (!t.alive) continue;
+      if (!t.alive || t.team === team) continue;
       if (Math.abs(t.pos.y - pos.y) > 1.5) continue;
       if (Math.hypot(t.pos.x - pos.x, t.pos.z - pos.z) > radius) continue;
       t.takeDamage(damage, this);
@@ -271,15 +308,20 @@ export class Simulation {
 
   // ---- combat & objective callbacks ----------------------------------------------
 
-  damageGuard(guard, amount) {
-    guard.takeDamage(amount);
-    this.events.push({ type: 'hit', pos: { x: guard.pos.x, y: guard.pos.y + 0.6, z: guard.pos.z } });
-    if (!guard.alive) this.events.push({ type: 'guardDead', pos: { ...guard.pos } });
+  /** Apply damage to a guard or a troop and emit the matching effects. */
+  damageUnit(target, amount) {
+    if (target instanceof Guard) {
+      target.takeDamage(amount);
+      this.events.push({ type: 'hit', pos: { x: target.pos.x, y: target.pos.y + 0.6, z: target.pos.z } });
+      if (!target.alive) this.events.push({ type: 'guardDead', pos: { ...target.pos } });
+    } else {
+      target.takeDamage(amount, this);
+    }
   }
 
   onTroopDied(troop, cause) {
-    this.lost++;
-    this.events.push({ type: 'death', pos: { ...troop.pos }, cause });
+    if (troop.team === TEAM.PLAYER) this.lost++;
+    this.events.push({ type: 'death', pos: { ...troop.pos }, cause, team: troop.team });
   }
 
   troopReachedObjective(troop) {
@@ -289,11 +331,11 @@ export class Simulation {
 
   tryPickupCrate(troop) {
     if (troop.equipment) return; // one equipment slot per troop
-    const crate = this.crateAt(troop.cell);
+    const crate = this.crateAt(troop.cell, troop.team);
     if (!crate) return;
     const def = EQUIPMENT[crate.kind];
     crate.remaining--;
-    def.apply(troop);
+     def.apply(troop, this.rules);
     troop.equipment = crate.kind;
     this.events.push({ type: 'pickup', pos: { ...troop.pos }, color: def.color });
   }
@@ -305,7 +347,10 @@ export class Simulation {
     return table[key] ?? 0;
   }
 
-  /** A free, walkable cell: in bounds, air, solid floor, no crate / sign / guard. */
+  /**
+   * A walkable cell that can take an item: in bounds, air, solid floor, no other crate / sign /
+   * guard. Troops standing on the cell do not matter — items may be dropped into a crowd.
+   */
   isFreeFloorCell(c) {
     const w = this.world;
     return w.inBounds(c.x, c.y, c.z) &&
@@ -327,7 +372,7 @@ export class Simulation {
     if (!this.canPlaceCrate(kind, c)) return false;
     this.budget.crates[kind]--;
     const def = EQUIPMENT[kind];
-    this.crates.push(new Crate(this.nextId++, kind, c.x, c.y, c.z, def.capacity));
+     this.crates.push(new Crate(this.nextId++, kind, c.x, c.y, c.z, this.rules.crateCapacity, TEAM.PLAYER));
     this.events.push({ type: 'crate', pos: center(c), color: def.color });
     return true;
   }
@@ -336,21 +381,21 @@ export class Simulation {
     return this.status === GAME_STATUS.PLAYING &&
       !!SIGNS[kind] &&
       this.budgetFor('sign', kind) > 0 &&
-      this.isFreeFloorCell(c) &&
-      (kind !== 'blocker' || !this.troopAt(c)); // a blocker never traps a troop inside it
+      this.isFreeFloorCell(c);
   }
 
   placeSign(kind, c, dir) {
     if (!this.canPlaceSign(kind, c)) return false;
     this.budget.signs[kind]--;
-    const sign = new Sign(this.nextId++, kind, c.x, c.y, c.z, dir);
+    const sign = new Sign(this.nextId++, kind, c.x, c.y, c.z, dir, TEAM.PLAYER);
     this.signs.push(sign);
     this.events.push({ type: 'sign', pos: center(c), color: SIGNS[kind].color });
     return true;
   }
 
-  /** Signs return to the inventory at no cost. */
+  /** Player signs return to the inventory at no cost; enemy signs are part of the level. */
   pickUpSign(sign) {
+    if (sign.team !== TEAM.PLAYER) return false;
     const i = this.signs.indexOf(sign);
     if (i < 0) return false;
     this.signs.splice(i, 1);
@@ -359,15 +404,15 @@ export class Simulation {
     return true;
   }
 
-  rotateSign(sign) {
-    if (!SIGNS[sign.kind]?.directional) return false;
-    sign.rotate();
+  rotateSign(sign, steps = 1) {
+    if (!SIGNS[sign.kind]?.directional || sign.team !== TEAM.PLAYER) return false;
+    sign.rotate(steps);
     return true;
   }
 
   assignRole(troop, roleName) {
     const role = ROLES[roleName];
-    if (!role || !troop || !troop.alive) return false;
+    if (!role || !troop || !troop.alive || troop.team !== TEAM.PLAYER) return false;
     if (this.status !== GAME_STATUS.PLAYING) return false;
     if (this.budgetFor('role', roleName) <= 0) return false;
     if (troop.role === role) return false;
@@ -390,7 +435,7 @@ export class Simulation {
       this.loseReason = 'Time expired';
       return;
     }
-    if (this.pool <= 0 && this.troops.length === 0) {
+    if (this.spawn.pool <= 0 && this.countTroops(TEAM.PLAYER) === 0) {
       this.status = GAME_STATUS.LOST;
       this.loseReason = 'Reinforcements exhausted';
     }

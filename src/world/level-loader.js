@@ -1,6 +1,10 @@
 import { World } from './world.js';
 import { VOXEL_BY_NAME, VOXEL_TYPES } from './voxel.js';
 import { GUARD_TYPES } from '../units/guard.js';
+import { SIGNS } from '../items/sign.js';
+import { EQUIPMENT } from '../items/equipment.js';
+import { normalizeTeam } from '../units/team.js';
+import { normalizeRules } from '../rules.js';
 
 /** Fetch a level JSON file by URL and validate it. */
 export async function loadLevel(url) {
@@ -28,6 +32,20 @@ export function parseLevel(text) {
 
 const isInt = (v) => Number.isInteger(v);
 const isVec = (v, n) => Array.isArray(v) && v.length === n && v.every(isInt);
+const isFacing = (v) => isVec(v, 2) && !(v[0] === 0 && v[1] === 0);
+
+/** Sign kinds from earlier designs (notes.md): the old turn signs are now the single Arrow sign. */
+const LEGACY_SIGN_KIND = { turnLeft: 'arrow', turnRight: 'arrow', turn: 'arrow', fanOut: 'fan', divert: 'fan' };
+
+function normalizeSignBudget(raw) {
+  const out = {};
+  for (const [k, v] of Object.entries(raw || {})) {
+     const key = LEGACY_SIGN_KIND[k] ?? k;
+    if (!SIGNS[key] || !Number.isFinite(v)) continue;
+    out[key] = (out[key] ?? 0) + Math.max(0, Math.round(v));
+  }
+  return out;
+}
 
 /**
  * Deep-clones a raw level object, validates the required fields and fills in defaults so the
@@ -45,7 +63,7 @@ export function normalizeLevel(raw) {
 
   const sp = level.spawn;
   if (!sp || !isVec(sp.pos, 3)) throw new Error('"spawn.pos" must be [x, y, z]');
-  if (!isVec(sp.dir, 2) || (sp.dir[0] === 0 && sp.dir[1] === 0)) sp.dir = [1, 0];
+  if (!isFacing(sp.dir)) sp.dir = [1, 0];
   sp.count = isInt(sp.count) && sp.count > 0 ? sp.count : 20;
   sp.rate = Number.isFinite(sp.rate) && sp.rate > 0 ? sp.rate : 1.5;
 
@@ -62,19 +80,48 @@ export function normalizeLevel(raw) {
 
   level.lethalFall = isInt(level.lethalFall) && level.lethalFall > 0 ? level.lethalFall : 4;
   level.timeLimit = Number.isFinite(level.timeLimit) && level.timeLimit >= 0 ? level.timeLimit : 0;
+   level.rules = normalizeRules(level.rules); // tunable stats (rules.js), defaults when absent
   level.budget = {
     crates: { ...(level.budget?.crates || {}) },
-     signs: { ...(level.budget?.signs || {}) },
+    signs: normalizeSignBudget(level.budget?.signs),
     roles: { ...(level.budget?.roles || {}) },
   };
   level.guards = Array.isArray(level.guards)
     ? level.guards
         .filter((g) => g && isVec(g.pos, 3))
-         .map((g) => ({
-           type: typeof g.type === 'string' && GUARD_TYPES[g.type] ? g.type : 'sentry',
-           pos: g.pos,
-           dir: isVec(g.dir, 2) ? g.dir : [-1, 0],
-         }))
+        .map((g) => ({
+          type: typeof g.type === 'string' && GUARD_TYPES[g.type] ? g.type : 'sentry',
+          pos: g.pos,
+          dir: isVec(g.dir, 2) ? g.dir : [-1, 0],
+        }))
+    : [];
+
+  // Enemy drop pods: their columns follow enemy signs / crates and fight the player's troops.
+  level.enemySpawners = Array.isArray(level.enemySpawners)
+    ? level.enemySpawners
+        .filter((s) => s && isVec(s.pos, 3))
+        .map((s) => ({
+          pos: s.pos,
+          dir: isFacing(s.dir) ? s.dir : [-sp.dir[0], -sp.dir[1]],
+          count: isInt(s.count) && s.count > 0 ? s.count : 10,
+          rate: Number.isFinite(s.rate) && s.rate > 0 ? s.rate : 2,
+        }))
+    : [];
+  // Level-authored signs and crates, each tagged with the team it affects.
+  level.signs = Array.isArray(level.signs)
+    ? level.signs
+         .map((s) => (s && typeof s.kind === 'string' ? { ...s, kind: LEGACY_SIGN_KIND[s.kind] ?? s.kind } : s))
+        .filter((s) => s && isVec(s.pos, 3) && typeof s.kind === 'string' && SIGNS[s.kind])
+        .map((s) => ({ kind: s.kind, pos: s.pos, dir: isFacing(s.dir) ? s.dir : [...sp.dir], team: normalizeTeam(s.team) }))
+    : [];
+  level.crates = Array.isArray(level.crates)
+    ? level.crates
+        .filter((c) => c && isVec(c.pos, 3) && typeof c.kind === 'string' && EQUIPMENT[c.kind])
+        .map((c) => {
+          const out = { kind: c.kind, pos: c.pos, team: normalizeTeam(c.team) };
+          if (isInt(c.capacity) && c.capacity > 0) out.capacity = c.capacity;
+          return out;
+        })
     : [];
 
   if (level.voxels !== undefined && !Array.isArray(level.voxels?.rle)) {
@@ -159,12 +206,15 @@ export function newBlankLevel(w = 32, h = 12, d = 12) {
       to: [Math.min(w - 1, ox + 2), 3, Math.min(d - 1, mid + 1)],
       required: 5,
     },
-     budget: {
-       crates: { rifle: 1, pickaxe: 1, ladder: 1 },
-       signs: { blocker: 2, turnLeft: 1, turnRight: 1, fanOut: 1, divert: 1 },
-       roles: { builder: 2 },
-     },
+    budget: {
+      crates: { rifle: 1, pickaxe: 1, ladder: 1 },
+       signs: { blocker: 2, arrow: 2, fan: 1, forward: 1 },
+      roles: { builder: 2 },
+    },
     guards: [],
+    enemySpawners: [],
+    signs: [],
+    crates: [],
     fills: [
       { type: 'bedrock', from: [0, 0, 0], to: [w - 1, 0, d - 1] },
       { type: 'dirt', from: [0, 1, 0], to: [w - 1, Math.min(2, h - 1), d - 1] },

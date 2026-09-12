@@ -1,3 +1,5 @@
+import { TEAM } from '../units/team.js';
+
 function el(tag, className, id) {
   const e = document.createElement(tag);
   if (className) e.className = className;
@@ -18,10 +20,10 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/** Budgets, counters, role/crate palette and end-of-level overlay. */
+/** Budgets, counters, role/crate/sign palette and end-of-level overlay. */
 export class Hud {
   constructor(root, handlers) {
-     this.root = root;
+    this.root = root;
     this.handlers = handlers;
     this.tools = handlers.tools;
     this.toolButtons = new Map();
@@ -35,6 +37,7 @@ export class Hud {
     for (const [key, label] of [
       ['pool', 'Reinforcements'],
       ['out', 'Marching'],
+      ['enemies', 'Enemies'],
       ['saved', 'Saved'],
       ['lost', 'Lost'],
       ['time', 'Time'],
@@ -54,9 +57,16 @@ export class Hud {
     this.pauseBtn = button('Pause [Space]', handlers.onTogglePause);
     this.speedBtn = button('Speed 1× [F]', handlers.onCycleSpeed);
     this.isoBtn = button('Isometric [I]', handlers.onToggleIso);
+    this.viewBtn = button('Reset view [V]', handlers.onResetView);
+    this.rotateBtn = button('Sign: — [Q]', handlers.onRotateSign);
+    this.rotateBtn.title = 'Facing given to the next sign you plant. Q or the mouse wheel (with a sign tool) rotates it.';
     this.restartBtn = button('Restart [R]', handlers.onRestart);
-     this.editorBtn = button('Editor [E]', handlers.onOpenEditor);
-     this.controls.append(this.pauseBtn, this.speedBtn, this.isoBtn, this.restartBtn, this.editorBtn);
+     this.campaignBtn = button('Campaign [C]', handlers.onStartCampaign);
+     this.campaignBtn.title = 'Play the generated campaign from its first level';
+    this.editorBtn = button('Editor [E]', handlers.onOpenEditor);
+     this.controls.append(
+       this.pauseBtn, this.speedBtn, this.isoBtn, this.viewBtn, this.rotateBtn, this.restartBtn, this.campaignBtn, this.editorBtn,
+     );
     root.append(this.controls);
 
     // Palette
@@ -93,7 +103,10 @@ export class Hud {
     const card = el('div', 'card');
     this.overlayTitle = el('h2');
     this.overlayText = el('p');
-    card.append(this.overlayTitle, this.overlayText, button('Play again', handlers.onRestart));
+     this.nextBtn = button('Next level [N]', handlers.onNextLevel, 'btn primary');
+     const buttons = el('div', 'row');
+     buttons.append(this.nextBtn, button('Play again', handlers.onRestart));
+     card.append(this.overlayTitle, this.overlayText, buttons);
     this.overlay.append(card);
     root.append(this.overlay);
   }
@@ -118,10 +131,16 @@ export class Hud {
   setIso(on) {
     this.isoBtn.classList.toggle('active', on);
   }
-   /** Hide the whole HUD (used while the level designer is open). */
-   setVisible(on) {
-     this.root.classList.toggle('hidden', !on);
-   }
+
+  /** Facing given to the next sign the player plants. */
+  setSignDir(label) {
+    this.rotateBtn.textContent = `Sign: ${label} [Q]`;
+  }
+
+  /** Hide the whole HUD (used while the level designer is open). */
+  setVisible(on) {
+    this.root.classList.toggle('hidden', !on);
+  }
 
   showToast(text, ms = 2000) {
     this.toast.textContent = text;
@@ -132,8 +151,10 @@ export class Hud {
 
   update(sim, budgetFor) {
     this.title.textContent = sim.level.name;
+    const marching = sim.countTroops(TEAM.PLAYER);
     this.stats.pool.textContent = String(sim.pool);
-    this.stats.out.textContent = String(sim.troops.length);
+    this.stats.out.textContent = String(marching);
+    this.stats.enemies.textContent = String(sim.troops.length - marching + sim.guards.length);
     this.stats.saved.textContent = `${sim.saved} / ${sim.objective.required}`;
     this.stats.lost.textContent = String(sim.lost);
     this.stats.time.textContent = sim.timeLimit > 0
@@ -149,11 +170,13 @@ export class Hud {
     }
   }
 
-  showEnd(status, sim) {
+   /** End-of-level card; `hasNext` shows the "Next level" button of the campaign progression. */
+   showEnd(status, sim, { hasNext = false } = {}) {
     const won = status === 'won';
     this.overlayTitle.textContent = won ? 'Objective Secured' : 'Assault Failed';
     this.overlayText.textContent =
       `${won ? '' : `${sim.loseReason}. `}Saved ${sim.saved}/${sim.objective.required} · Lost ${sim.lost} · Time ${formatTime(sim.time)}`;
+     this.nextBtn.classList.toggle('hidden', !(won && hasNext));
     this.overlay.classList.remove('hidden');
   }
 

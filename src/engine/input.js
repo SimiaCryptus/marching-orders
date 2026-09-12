@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 const CLICK_DRAG_THRESHOLD = 6; // px — anything further is an orbit/pan, not a click
+const WHEEL_NOTCH = 40;         // accumulated wheel pixels per rotation step (trackpads send many tiny deltas)
 
 /**
  * Mouse/keyboard input with raycasting into the voxel grid, instanced units and signs.
@@ -13,7 +14,9 @@ const CLICK_DRAG_THRESHOLD = 6; // px — anything further is an orbit/pan, not 
  * When nothing solid is hit, the y = 0 ground plane inside the level bounds is used as a
  * virtual floor (cell.y = -1) so the editor can paint on empty maps.
  *
- * Handlers: onClick(hit, e) for left clicks, onRightClick(hit, e) for right clicks, onHover, onKey.
+ * Handlers: onClick(hit, e) for left clicks, onRightClick(hit, e) for right clicks, onHover,
+ * onKey, and onWheel(hit, steps, e) where steps is -1 / 0 / +1 per accumulated notch. When
+ * onWheel returns true the event is consumed and no longer zooms the camera.
  */
 export class Input {
   constructor(renderer, handlers) {
@@ -22,6 +25,8 @@ export class Input {
     this.raycaster = new THREE.Raycaster();
     this.ndc = new THREE.Vector2();
     this.down = null;
+    this.wheelAcc = 0;
+    this.wheelTime = 0;
 
     const dom = renderer.gl.domElement;
     dom.addEventListener('pointerdown', (e) => {
@@ -43,12 +48,34 @@ export class Input {
     });
     dom.addEventListener('pointerleave', () => handlers.onHover?.(null));
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Capture on the container so this runs before OrbitControls' zoom handler on the canvas.
+    renderer.container.addEventListener('wheel', (e) => this.onWheel(e), { capture: true, passive: false });
     window.addEventListener('keydown', (e) => {
       const t = e.target;
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement ||
           t instanceof HTMLSelectElement || t?.isContentEditable) return;
       handlers.onKey?.(e);
     });
+  }
+
+  onWheel(e) {
+    if (!this.handlers.onWheel) return;
+    const now = performance.now();
+    if (now - this.wheelTime > 400) this.wheelAcc = 0;
+    this.wheelTime = now;
+    const scale = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1; // lines / pages -> pixels
+    this.wheelAcc += e.deltaY * scale;
+    let steps = 0;
+    if (Math.abs(this.wheelAcc) >= WHEEL_NOTCH) {
+      steps = Math.sign(this.wheelAcc);
+      this.wheelAcc = 0;
+    }
+    if (this.handlers.onWheel(this.pick(e), steps, e)) {
+      e.preventDefault();
+      e.stopPropagation();
+    } else {
+      this.wheelAcc = 0;
+    }
   }
 
   pick(event) {

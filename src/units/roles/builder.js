@@ -27,9 +27,10 @@ export const BuilderRole = Object.freeze({
     const stand = { x: brick.x, y: brick.y + 1, z: brick.z };
 
     if (!world.inBounds(brick.x, brick.y, brick.z) ||
+         !world.inBounds(stand.x, stand.y, stand.z) ||
         world.isSolid(brick.x, brick.y, brick.z) ||
         world.isSolid(stand.x, stand.y, stand.z) ||
-        sim.isBlocked(stand)) {
+         sim.isBlocked(stand, troop.team)) {
       troop.clearRole(sim);
       troop.dir = turnAround(troop.dir);
       return true;

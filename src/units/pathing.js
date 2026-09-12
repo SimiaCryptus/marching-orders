@@ -56,10 +56,16 @@ export function nextStep(world, x, y, z, dirIndex, opts = {}) {
 
   const { dx, dz } = DIRS[dirIndex];
   const tx = x + dx, tz = z + dz;
+   // The level edge is an unbreakable wall on every side: units never step, climb or ladder out
+   // of the map (notes.md bug: ladders built against the bounds let soldiers escape).
+   if (tx < 0 || tx >= world.w || tz < 0 || tz >= world.d) return { action: 'turn', target: null };
   const onLadder = isClimbable(world.get(x, y, z));
 
   if (world.isSolid(tx, y, tz)) {
-    if (!world.isSolid(tx, y + 1, tz)) return { action: 'stepUp', target: { x: tx, y: y + 1, z: tz } };
+     if (!world.isSolid(tx, y + 1, tz)) {
+       if (y + 1 >= world.h) return { action: 'turn', target: null }; // never step out over the top of the map
+       return { action: 'stepUp', target: { x: tx, y: y + 1, z: tz } };
+     }
     // The wall is at least two high: climb an existing ladder, extend one, dig, or give up.
     if (isClimbable(world.get(x, y + 1, z))) return { action: 'climb', target: { x, y: y + 1, z } };
     // The wall continues at y+1 (checked above), so a ladder placed here always leans on

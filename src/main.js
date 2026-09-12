@@ -1,13 +1,15 @@
 import { Renderer } from './engine/renderer.js';
 import { Input } from './engine/input.js';
 import { loadLevel, buildWorld, decodeLevelHash } from './world/level-loader.js';
+import { buildCampaignLevel, CAMPAIGN_LENGTH } from './world/level-builder.js';
 import { Simulation, GAME_STATUS } from './simulation.js';
 import { Hud } from './ui/hud.js';
 import { Editor } from './ui/editor.js';
 import { EQUIPMENT } from './items/equipment.js';
-import { SIGNS } from './items/sign.js';
+import { SIGNS, describeSign } from './items/sign.js';
 import { ROLES } from './units/roles/index.js';
-import { DIR_LABELS, turnRight } from './units/pathing.js';
+import { TEAM } from './units/team.js';
+import { DIR_LABELS, turnLeft, turnRight } from './units/pathing.js';
 
 // Fixed-timestep simulation decoupled from the render frame rate (idea.md §6).
 const FIXED_DT = 1 / 60;
@@ -25,12 +27,14 @@ const TOOLS = [
 ].map((t, i) => ({ ...t, hotkey: String((i + 1) % 10) }));
 
 const DEFAULT_HINT =
-  'Pick a tool (1-9), then click the map. Q rotates sign facing; right-click or shift-click a placed sign to pick it up. E opens the level designer.';
+   `Pick a tool (1-${TOOLS.length}), then click the map — even through a crowd. Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ` +
+   'right-click or shift-click a placed sign to pick it up. V resets the view, E opens the level designer, C starts the campaign.';
 
 /**
  * Startup options from the page URL:
  *   ?level=<url>     fetch a level JSON file (relative or absolute URL)
  *   #level=<data>    play a level embedded in the URL (created by the designer's "Copy play link")
+  *   ?campaign=<n>    play level n (1-based) of the generated campaign
  *   ?edit  /  #edit  open the level designer instead of playing
  */
 function readStartupOptions() {
@@ -39,6 +43,7 @@ function readStartupOptions() {
   return {
     levelUrl: query.get('level'),
     levelData: hash.get('level'),
+     campaign: query.get('campaign') ?? hash.get('campaign'),
     edit: query.has('edit') || hash.has('edit'),
   };
 }
@@ -54,6 +59,10 @@ class Game {
       onToggleIso: () => this.toggleIso(),
       onCycleSpeed: () => this.cycleSpeed(),
       onOpenEditor: () => this.openEditor(),
+      onRotateSign: () => this.rotateSignDir(1),
+      onResetView: () => this.renderer.resetView(),
+       onStartCampaign: () => this.startCampaign(),
+       onNextLevel: () => this.playNextCampaignLevel(),
     });
     this.editor = new Editor(editorRoot, this.renderer, {
       onPlay: (level) => this.playLevel(level, { keepCamera: true }),
@@ -63,6 +72,7 @@ class Game {
       onRightClick: (hit, e) => this.onRightClick(hit, e),
       onHover: (hit) => this.onHover(hit),
       onKey: (e) => this.onKey(e),
+      onWheel: (hit, steps) => this.onWheel(hit, steps),
     });
 
     this.mode = MODE.PLAY;
@@ -89,6 +99,13 @@ class Game {
     try {
       if (opts.levelData) level = decodeLevelHash(opts.levelData);
       else if (opts.levelUrl) level = await loadLevel(new URL(opts.levelUrl, location.href));
+       else if (opts.campaign !== null) {
+         const n = Number(opts.campaign);
+         if (!Number.isInteger(n) || n < 1 || n > CAMPAIGN_LENGTH) {
+           throw new Error(`campaign must be a number between 1 and ${CAMPAIGN_LENGTH}`);
+         }
+         level = buildCampaignLevel(n - 1);
+       }
     } catch (err) {
       console.error(err);
       warning = `Could not load the requested level: ${err.message}. Loaded the tutorial instead.`;
@@ -115,6 +132,7 @@ class Game {
     this.ended = false;
     this.paused = false;
     this.signDir = this.sim.spawn.dir;
+    this.hud.setSignDir(DIR_LABELS[this.signDir]);
     this.hud.hideEnd();
     this.hud.setPaused(false);
     this.hud.showToast(this.level.description || `Level: ${this.level.name}`, 6000);
@@ -137,9 +155,26 @@ class Game {
     this.mode = MODE.EDIT;
     this.selectTool(null);
     this.renderer.setCursor(null);
+     this.renderer.setSignPreview(null);
     this.hud.setVisible(false);
     this.editor.open(this.level, { keepCamera: !!this.sim });
   }
+   /** Index of the campaign level after the current one, or null when this is not a campaign level / it is the last. */
+   get nextCampaignIndex() {
+     const c = this.level && this.level.campaign;
+     if (!c || !Number.isInteger(c.index)) return null;
+     return c.index + 1 < CAMPAIGN_LENGTH ? c.index + 1 : null;
+   }
+   /** Play a level of the generated standard progression (0-based). */
+   startCampaign(index = 0) {
+     this.playLevel(buildCampaignLevel(index));
+   }
+   playNextCampaignLevel() {
+     const next = this.nextCampaignIndex;
+     if (next === null) { this.hud.showToast('That was the last campaign level — the tower is yours!', 3000); return; }
+     this.startCampaign(next);
+   }
+
 
   // ---- frame ----------------------------------------------------------------------
 
@@ -177,7 +212,7 @@ class Game {
     if (sim.status !== GAME_STATUS.PLAYING && !this.ended) {
       this.ended = true;
       this.selectTool(null);
-      this.hud.showEnd(sim.status, sim);
+       this.hud.showEnd(sim.status, sim, { hasNext: this.nextCampaignIndex !== null });
     }
   }
 
@@ -189,30 +224,62 @@ class Game {
     if (this.mode === MODE.PLAY) this.onHover(this.hover);
   }
 
-  rotateSignDir() {
-    this.signDir = turnRight(this.signDir);
+  /** Rotate the facing given to the next sign: clockwise for positive steps. */
+  rotateSignDir(steps = 1) {
+    this.signDir = steps < 0 ? turnLeft(this.signDir) : turnRight(this.signDir);
+    this.hud.setSignDir(DIR_LABELS[this.signDir]);
     this.hud.showToast(`Next sign faces ${DIR_LABELS[this.signDir]}.`, 1200);
     this.onHover(this.hover);
   }
 
-  findTroopFromHit(hit) {
+  /**
+   * The walkable cell an item would go on for this hit: the air cell on top of a floor voxel, the
+   * cell a troop stands in (so crowded areas can still be managed), or a placed sign's cell.
+   */
+  floorCellFromHit(hit) {
     if (!hit || !this.sim) return null;
-    if (hit.type === 'unit') return hit.batch === 'troops' && hit.unit && hit.unit.alive ? hit.unit : null;
-    if (hit.type === 'voxel') return this.sim.troopAt(hit.adjacent) || this.sim.troopAt(hit.cell);
+    if (hit.type === 'voxel') return hit.normal.y > 0.5 ? hit.adjacent : null;
+    if (hit.type === 'unit') return hit.batch === 'troops' && hit.unit && hit.unit.alive ? { ...hit.unit.cell } : null;
+    if (hit.type === 'sign') {
+      const s = this.sim.signById(hit.id);
+      return s ? s.cell : null;
+    }
     return null;
   }
 
-  /** The placed sign under the cursor: hit directly, or standing on the floor cell that was hit. */
+  findTroopFromHit(hit) {
+    if (!hit || !this.sim) return null;
+    if (hit.type === 'unit') {
+      const u = hit.unit;
+      return hit.batch === 'troops' && u && u.alive && u.team === TEAM.PLAYER ? u : null;
+    }
+    if (hit.type === 'voxel') return this.sim.troopAt(hit.adjacent, TEAM.PLAYER) || this.sim.troopAt(hit.cell, TEAM.PLAYER);
+    return null;
+  }
+
+  /** Any sign under the cursor (either team): hit directly, or standing on the cell that was hit. */
   signFromHit(hit) {
     if (!hit || !this.sim) return null;
     if (hit.type === 'sign') return this.sim.signById(hit.id);
-    if (hit.type === 'voxel') return this.sim.signAt(hit.adjacent);
-    return null;
+    const cell = this.floorCellFromHit(hit);
+    return cell ? this.sim.signAt(cell) : null;
+  }
+
+  /** A sign under the cursor the player owns (and may rotate / pick up). */
+  ownSignFromHit(hit) {
+    const s = this.signFromHit(hit);
+    return s && s.team === TEAM.PLAYER ? s : null;
+  }
+
+  signSummary(sign) {
+    const facing = sign.def.directional ? ` facing ${DIR_LABELS[sign.dir]}` : '';
+    return `${sign.def.label}${facing}`;
   }
 
   onHover(hit) {
     if (this.mode === MODE.EDIT) { this.editor.onHover(hit); return; }
     this.hover = hit;
+     this.renderer.setSignPreview(null); // re-shown below when a sign is about to be planted
     const sim = this.sim;
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) {
       this.renderer.setCursor(null);
@@ -220,13 +287,15 @@ class Game {
       return;
     }
     const sign = this.signFromHit(hit);
-    const top = hit.type === 'voxel' && hit.normal.y > 0.5;
+    const own = !!sign && sign.team === TEAM.PLAYER;
+    const cell = this.floorCellFromHit(hit);
 
     if (!this.tool) {
       if (sign) {
-        this.renderer.setCursor(sign.cell, 0xffd75a);
-        const facing = sign.def.directional ? ` facing ${DIR_LABELS[sign.dir]}` : '';
-        this.hud.setHint(`${sign.def.label}${facing} — right-click or shift-click to pick it up`);
+        this.renderer.setCursor(sign.cell, own ? 0xffd75a : 0xff6a6a);
+        this.hud.setHint(own
+          ? `${this.signSummary(sign)} — ${describeSign(sign.kind, sign.dir)}. Q / wheel rotates, right-click or shift-click picks it up`
+          : `Enemy ${this.signSummary(sign)} — steers the enemy column only`);
       } else {
         this.renderer.setCursor(null);
         this.hud.setHint(DEFAULT_HINT);
@@ -236,29 +305,36 @@ class Game {
 
     const label = this.tool.label;
     if (this.tool.kind === 'crate') {
-      if (top) {
-        const ok = sim.canPlaceCrate(this.tool.key, hit.adjacent);
-        this.renderer.setCursor(hit.adjacent, ok ? 0x7cff7c : 0xff6a6a);
+      if (cell) {
+        const ok = sim.canPlaceCrate(this.tool.key, cell);
+        this.renderer.setCursor(cell, ok ? 0x7cff7c : 0xff6a6a);
         this.hud.setHint(ok ? `Place ${label} here` : `Can't place ${label} here`);
       } else {
         this.renderer.setCursor(null);
-        this.hud.setHint(`Click the top of a floor voxel to drop a ${label}`);
+        this.hud.setHint(`Click the top of a floor voxel (or a troop standing on it) to drop a ${label}`);
       }
     } else if (this.tool.kind === 'sign') {
+      const def = SIGNS[this.tool.key];
       if (sign) {
-        const rotatable = sign.kind === this.tool.key && sign.def.directional;
-        this.renderer.setCursor(sign.cell, rotatable ? 0xffd75a : 0xff6a6a);
-        this.hud.setHint(rotatable
-          ? `Click to rotate this ${label} (facing ${DIR_LABELS[sign.dir]}); right-click or shift-click picks it up`
-          : `${sign.def.label} here — right-click or shift-click to pick it up`);
-      } else if (top) {
-        const ok = sim.canPlaceSign(this.tool.key, hit.adjacent);
-        this.renderer.setCursor(hit.adjacent, ok ? 0x7cff7c : 0xff6a6a);
-        const facing = SIGNS[this.tool.key].directional ? ` facing ${DIR_LABELS[this.signDir]} (Q rotates)` : '';
-        this.hud.setHint(ok ? `Place ${label} here${facing} — ${SIGNS[this.tool.key].describe}` : `Can't place ${label} here`);
+        if (own && sign.kind === this.tool.key && sign.def.directional) {
+          this.renderer.setCursor(sign.cell, 0xffd75a);
+          this.hud.setHint(`Click or wheel to rotate this ${this.signSummary(sign)}; right-click or shift-click picks it up`);
+        } else if (own) {
+          this.renderer.setCursor(sign.cell, 0xff6a6a);
+          this.hud.setHint(`${sign.def.label} here — right-click or shift-click to pick it up`);
+        } else {
+          this.renderer.setCursor(sign.cell, 0xff6a6a);
+          this.hud.setHint(`Enemy ${sign.def.label} here — it is part of the level`);
+        }
+      } else if (cell) {
+        const ok = sim.canPlaceSign(this.tool.key, cell);
+        this.renderer.setCursor(cell, ok ? 0x7cff7c : 0xff6a6a);
+         this.renderer.setSignPreview(this.tool.key, cell, this.signDir, ok);
+        const facing = def.directional ? ` facing ${DIR_LABELS[this.signDir]} (Q / wheel rotates)` : '';
+        this.hud.setHint(ok ? `Place ${label} here${facing} — ${describeSign(this.tool.key, this.signDir)}` : `Can't place ${label} here`);
       } else {
         this.renderer.setCursor(null);
-        this.hud.setHint(`Click the top of a floor voxel to plant a ${label}`);
+        this.hud.setHint(`Click the top of a floor voxel (or a troop standing on it) to plant a ${label}`);
       }
     } else {
       const troop = this.findTroopFromHit(hit);
@@ -278,21 +354,22 @@ class Game {
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return;
     if (e && e.shiftKey) { this.pickUpSign(hit); return; }
     if (!this.tool) {
-      this.hud.showToast('Select a tool first (keys 1-9). Right-click or shift-click a sign to pick it up.', 2000);
+      this.hud.showToast(`Select a tool first (keys 1-${TOOLS.length}). Right-click or shift-click a sign to pick it up.`, 2000);
       return;
     }
-    const top = hit.type === 'voxel' && hit.normal.y > 0.5;
+    const cell = this.floorCellFromHit(hit);
     let placed = false;
     if (this.tool.kind === 'crate') {
-      if (top) placed = sim.placeCrate(this.tool.key, hit.adjacent);
+      if (cell) placed = sim.placeCrate(this.tool.key, cell);
       if (!placed) this.hud.showToast(`Can't place a ${this.tool.label} there.`, 1500);
     } else if (this.tool.kind === 'sign') {
       const sign = this.signFromHit(hit);
       if (sign) {
-        if (sign.kind === this.tool.key && sign.def.directional) sim.rotateSign(sign);
+        if (sign.team !== TEAM.PLAYER) this.hud.showToast('That is an enemy sign — it belongs to the level.', 2000);
+        else if (sign.kind === this.tool.key && sign.def.directional) sim.rotateSign(sign, 1);
         else this.hud.showToast(`There is already a ${sign.def.label} here — right-click or shift-click to pick it up.`, 2000);
-      } else if (top) {
-        placed = sim.placeSign(this.tool.key, hit.adjacent, this.signDir);
+      } else if (cell) {
+        placed = sim.placeSign(this.tool.key, cell, this.signDir);
         if (!placed) this.hud.showToast(`Can't plant a ${this.tool.label} there.`, 1500);
       } else {
         this.hud.showToast('Click the top of a floor voxel to plant a sign.', 1500);
@@ -307,8 +384,28 @@ class Game {
   }
 
   onRightClick(hit) {
-    if (this.mode === MODE.EDIT) return;
+    if (this.mode === MODE.EDIT) { this.editor.onRightClick(hit); return; }
     this.pickUpSign(hit);
+  }
+
+  /**
+   * Mouse wheel: rotates the sign under the cursor (with no tool or a sign tool selected) or the
+   * facing of the next sign (with a directional sign tool selected). Otherwise it zooms.
+   */
+  onWheel(hit, steps) {
+    if (this.mode === MODE.EDIT) return this.editor.onWheel(hit, steps);
+    const sim = this.sim;
+    if (!sim || sim.status !== GAME_STATUS.PLAYING) return false;
+    const sign = this.ownSignFromHit(hit);
+    if (sign && sign.def.directional && (!this.tool || this.tool.kind === 'sign')) {
+      if (steps) { sim.rotateSign(sign, steps); this.onHover(hit); }
+      return true;
+    }
+    if (this.tool && this.tool.kind === 'sign' && SIGNS[this.tool.key].directional) {
+      if (steps) this.rotateSignDir(steps);
+      return true;
+    }
+    return false;
   }
 
   /** Signs go back to the inventory at no cost. */
@@ -317,8 +414,10 @@ class Game {
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return;
     const sign = this.signFromHit(hit);
     if (!sign) { this.hud.showToast('No sign there to pick up.', 1500); return; }
+    if (sign.team !== TEAM.PLAYER) { this.hud.showToast('Enemy signs cannot be picked up.', 1500); return; }
     sim.pickUpSign(sign);
     this.signDir = sign.dir; // re-placing it keeps the facing unless you rotate
+    this.hud.setSignDir(DIR_LABELS[this.signDir]);
     this.hud.showToast(`${sign.def.label} returned to inventory.`, 1500);
     this.onHover(hit);
   }
@@ -327,6 +426,7 @@ class Game {
     if (this.mode === MODE.EDIT) {
       if (this.editor.onKey(e)) return;
       if (e.code === 'KeyI') this.toggleIso();
+      if (e.code === 'KeyV') this.renderer.resetView();
       return;
     }
     const tool = TOOLS.find((t) => t.hotkey === e.key);
@@ -336,9 +436,24 @@ class Game {
       case 'Space': e.preventDefault(); this.togglePause(); break;
       case 'KeyF': this.cycleSpeed(); break;
       case 'KeyI': this.toggleIso(); break;
+      case 'KeyV': this.renderer.resetView(); break;
       case 'KeyR': this.reset({ keepCamera: true }); break;
       case 'KeyE': this.openEditor(); break;
-      case 'KeyQ': this.rotateSignDir(); break;
+       case 'KeyC': this.startCampaign(); break;
+       case 'KeyN':
+         if (this.ended && this.sim && this.sim.status === GAME_STATUS.WON) this.playNextCampaignLevel();
+         break;
+      case 'KeyQ': {
+        // Rotate the sign under the cursor when there is one, else the next sign's facing.
+        const sign = this.ownSignFromHit(this.hover);
+        if (this.sim && sign && sign.def.directional && (!this.tool || this.tool.kind === 'sign')) {
+          this.sim.rotateSign(sign, 1);
+          this.onHover(this.hover);
+        } else {
+          this.rotateSignDir(1);
+        }
+        break;
+      }
       default: break;
     }
   }

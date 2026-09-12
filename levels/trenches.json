@@ -1,0 +1,56 @@
+{
+  "name": "The Trench Network",
+  "description": "The column drops into a 2-deep trench network: three east-west trenches (north, middle, south) linked by three cross-cuts at x=12, x=22 and x=30. Spike beds block the middle trench at x=18, the north trench at x=16 and the south trench at x=33, so the only clean run is middle -> south -> north. Two turrets cover the long straights, a sentry holds the x=22 junction and a grenadier shells the final approach, and two enemy pods march west down the south and middle trenches. Arm the column at the rifle crates, steer it with arrow and forward signs, and get 6 of 24 troops into the vault at x=37.",
+  "size": [40, 14, 16],
+  "lethalFall": 4,
+  "timeLimit": 420,
+  "rules": {
+    "enemyTroopHp": 13,
+    "guardHpScale": 1.15,
+    "guardDamageScale": 1.1,
+    "guardRangeScale": 1.1,
+    "rifleRange": 8,
+    "rifleAttack": 3,
+    "crateCapacity": 5
+  },
+  "spawn": { "pos": [2, 3, 8], "dir": [1, 0], "count": 24, "rate": 1.4 },
+  "objective": { "type": "reach", "from": [37, 1, 3], "to": [38, 1, 4], "required": 6 },
+  "budget": {
+    "crates": { "rifle": 2, "pickaxe": 1, "ladder": 1 },
+    "signs": { "blocker": 3, "arrow": 4, "fan": 1, "forward": 2 },
+    "roles": { "builder": 2 }
+  },
+  "guards": [
+    { "type": "turret", "pos": [35, 1, 4], "dir": [-1, 0] },
+    { "type": "turret", "pos": [24, 1, 12], "dir": [-1, 0] },
+    { "type": "sentry", "pos": [22, 1, 4], "dir": [-1, 0] },
+    { "type": "grenadier", "pos": [30, 1, 4], "dir": [-1, 0] }
+  ],
+  "enemySpawners": [
+    { "pos": [35, 1, 12], "dir": [-1, 0], "count": 8, "rate": 6 },
+    { "pos": [34, 1, 7], "dir": [-1, 0], "count": 6, "rate": 7 }
+  ],
+  "signs": [],
+  "crates": [
+    { "kind": "rifle", "pos": [10, 1, 8], "team": "player", "capacity": 8 },
+    { "kind": "rifle", "pos": [16, 1, 11], "team": "player", "capacity": 6 }
+  ],
+  "fills": [
+    { "type": "bedrock", "from": [0, 0, 0], "to": [39, 0, 15] },
+    { "type": "dirt", "from": [0, 1, 0], "to": [39, 2, 15] },
+
+    { "type": "air", "from": [6, 1, 3], "to": [38, 2, 4] },
+    { "type": "air", "from": [6, 1, 7], "to": [35, 2, 8] },
+    { "type": "air", "from": [6, 1, 11], "to": [35, 2, 12] },
+
+    { "type": "air", "from": [12, 1, 3], "to": [13, 2, 12] },
+    { "type": "air", "from": [22, 1, 3], "to": [23, 2, 12] },
+    { "type": "air", "from": [30, 1, 3], "to": [31, 2, 12] },
+
+    { "type": "spikes", "from": [16, 0, 3], "to": [17, 0, 4] },
+    { "type": "spikes", "from": [18, 0, 7], "to": [19, 0, 8] },
+    { "type": "spikes", "from": [33, 0, 11], "to": [34, 0, 12] },
+
+    { "type": "objective", "from": [37, 0, 3], "to": [38, 0, 4] }
+  ]
+}

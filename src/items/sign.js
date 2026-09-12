@@ -1,53 +1,74 @@
-import { DIRS, turnAround, turnLeft, turnRight } from '../units/pathing.js';
+import { DIRS, DIR_LABELS, turnAround, turnLeft, turnRight } from '../units/pathing.js';
+import { TEAM } from '../units/team.js';
 
 const QUARTER = Math.PI / 2;
 
 /**
- * Sign definitions (notes.md). Signs are player-placed markers on walkable cells that shape the
- * flow of the column. Directional signs have a facing; troops marching the opposite way see the
- * reflected effect, so a path that bends one way out also bends correctly on the way back:
- *   turn left  <->  turn right
- *   fan out    <->  funnel (divert) of radius 1
- *   divert     <->  fan out
- * `arrows` are rendering hints in the sign's local frame: yaw in radians (+ = left) and a
- * lateral offset `ox` (+ = left).
+ * Sign definitions (notes.md). Signs are markers on walkable cells that shape the flow of a
+ * column. Every sign belongs to a team and only steers troops of that team.
+ *
+ * Every directional sign is a single rotatable placement (Q / mouse wheel / rotate button) and
+ * the renderer draws its effect on the ground under it (and under the placement ghost), so what
+ * you see is what the column does:
+ *   arrow    — the one rule to remember: every troop that steps onto the sign marches the way
+ *              the arrow points, whatever direction it arrived from.
+ *   fan      — fans the column over three lanes marching its way; troops marching back toward
+ *              it from within `radius` cells are funnelled onto its lane instead.
+ *   forward  — troops crossing it sideways turn to march its way; troops already moving along
+ *              its axis pass through (a one-way arrow that leaves the return trip alone).
+ *   blocker  — not directional: troops refuse to step onto it and turn around.
+ * `arrows` are rendering hints for the plate in the sign's local frame: yaw in radians
+ * (+ = left) and a lateral offset `ox` (+ = left).
  */
 export const SIGNS = Object.freeze({
   blocker: {
     name: 'blocker', label: 'Blocker Sign', color: 0xe04848, directional: false, bar: true, arrows: [],
     describe: 'troops that bump into it turn around',
   },
-  turnLeft: {
-    name: 'turnLeft', label: 'Turn Left Sign', color: 0x4ad0c0, directional: true,
-    arrows: [{ yaw: QUARTER }],
-    describe: 'the column turns left (right when marching back)',
+  arrow: {
+    name: 'arrow', label: 'Arrow Sign', color: 0x4ad0c0, directional: true,
+    arrows: [{ yaw: 0 }],
+    describe: 'every troop that steps onto it marches the way the arrow points',
   },
-  turnRight: {
-    name: 'turnRight', label: 'Turn Right Sign', color: 0x3f8fe0, directional: true,
-    arrows: [{ yaw: -QUARTER }],
-    describe: 'the column turns right (left when marching back)',
-  },
-  fanOut: {
-    name: 'fanOut', label: 'Fan Out Sign', color: 0xc47ae8, directional: true,
+  fan: {
+    name: 'fan', label: 'Fan Sign', color: 0xc47ae8, directional: true, radius: 2,
     arrows: [{ yaw: 0 }, { yaw: QUARTER / 2, ox: 0.22 }, { yaw: -QUARTER / 2, ox: -0.22 }],
-    describe: 'spreads the column over three lanes (funnels it when marching back)',
+    describe: 'spreads the column over three lanes marching its way; funnels troops within 2 cells onto its lane marching back (rotate 180° to swap)',
   },
-  divert: {
-    name: 'divert', label: 'Divert Sign', color: 0xf0a030, directional: true, radius: 2,
-    arrows: [{ yaw: -QUARTER / 2, ox: 0.25 }, { yaw: 0 }, { yaw: QUARTER / 2, ox: -0.25 }],
-    describe: 'funnels troops within 2 cells onto this cell (fans out when marching back)',
+  forward: {
+    name: 'forward', label: 'Forward Sign', color: 0xf0a030, directional: true,
+    arrows: [{ yaw: 0, ox: 0.16 }, { yaw: 0, ox: -0.16 }],
+    describe: 'troops crossing it sideways turn to march its way; troops already on its axis pass through',
   },
 });
 
+/** Concrete effect of a sign kind at a given facing, using compass names (for hints). */
+export function describeSign(kind, dir) {
+  const def = SIGNS[kind];
+  if (!def || !def.directional) return def ? def.describe : '';
+  const L = (d) => DIR_LABELS[d];
+  switch (kind) {
+    case 'arrow':
+      return `every troop crossing it marches ${L(dir)}`;
+    case 'fan':
+      return `fans troops marching ${L(dir)} over three lanes; funnels troops marching ${L(turnAround(dir))} onto its lane`;
+    case 'forward':
+      return `troops marching ${L(turnLeft(dir))} or ${L(turnRight(dir))} turn to march ${L(dir)}`;
+    default:
+      return def.describe;
+  }
+}
+
 /** A placed sign. `dir` is a DIRS index; `counter` drives the round-robin distributor. */
 export class Sign {
-  constructor(id, kind, x, y, z, dir) {
+  constructor(id, kind, x, y, z, dir, team = TEAM.PLAYER) {
     this.id = id;
     this.kind = kind;
     this.x = x;
     this.y = y;
     this.z = z;
     this.dir = dir;
+    this.team = team;
     this.counter = 0;
   }
 
@@ -59,8 +80,9 @@ export class Sign {
     return { x: this.x, y: this.y, z: this.z };
   }
 
-  rotate() {
-    this.dir = turnRight(this.dir);
+  /** Rotate a quarter turn: clockwise for positive steps, counter-clockwise for negative. */
+  rotate(steps = 1) {
+    this.dir = steps < 0 ? turnLeft(this.dir) : turnRight(this.dir);
   }
 }
 
@@ -68,22 +90,24 @@ const LEGS = [0, -1, 1]; // straight, one lane left, one lane right
 
 /**
  * Where a single diagonal step (one forward along `fd`, one sideways: -1 = left, +1 = right)
- * from `c` lands, following the same ledge rules as `nextStep`. Null when it is not walkable.
+ * from `c` lands, following the same ledge rules as `nextStep`. Null when it is not walkable
+ * for a troop of `team` (blockers are per team) or when it would leave the map.
  */
-export function diagonalTarget(sim, c, fd, side) {
+export function diagonalTarget(sim, c, fd, side, team = TEAM.PLAYER) {
   const world = sim.world;
   const f = DIRS[fd], r = DIRS[turnRight(fd)];
   const tx = c.x + f.dx + side * r.dx;
   const tz = c.z + f.dz + side * r.dz;
+  if (tx < 0 || tx >= world.w || tz < 0 || tz >= world.d) return null; // the level edge is a wall
   let target = null;
   if (world.isSolid(tx, c.y, tz)) {
-    if (!world.isSolid(tx, c.y + 1, tz)) target = { x: tx, y: c.y + 1, z: tz };
+    if (!world.isSolid(tx, c.y + 1, tz) && c.y + 1 < world.h) target = { x: tx, y: c.y + 1, z: tz };
   } else if (world.isSolid(tx, c.y - 1, tz)) {
     target = { x: tx, y: c.y, z: tz };
   } else if (world.isSolid(tx, c.y - 2, tz)) {
     target = { x: tx, y: c.y - 1, z: tz };
   }
-  if (!target || sim.isBlocked(target) || sim.guardAt(target)) return null;
+  if (!target || sim.isBlocked(target, team) || sim.guardAt(target)) return null;
   return target;
 }
 
@@ -91,7 +115,7 @@ export function diagonalTarget(sim, c, fd, side) {
 function distribute(troop, sign, fd, sim) {
   const side = LEGS[sign.counter++ % LEGS.length];
   if (side === 0) return true;
-  const target = diagonalTarget(sim, troop.cell, fd, side);
+  const target = diagonalTarget(sim, troop.cell, fd, side, troop.team);
   if (target) troop.setTarget(target, troop.speed);
   return true;
 }
@@ -108,41 +132,37 @@ function funnel(troop, sign, fd, radius, sim) {
   const across = dx * r.dx + dz * r.dz;  // > 0: right of the sign's lane
   if (across === 0 || Math.abs(across) > radius || along < -radius || along > -1) return false;
   if (Math.abs(troop.cell.y - sign.y) > 1) return false;
-  const target = diagonalTarget(sim, troop.cell, fd, across > 0 ? -1 : 1);
+  const target = diagonalTarget(sim, troop.cell, fd, across > 0 ? -1 : 1, troop.team);
   if (!target) return false;
   troop.setTarget(target, troop.speed);
   return true;
 }
 
 /**
- * Called when a troop finishes a step. Applies the first sign whose rule matches the troop's
- * cell and facing. Returns true when a sign changed the troop's facing or gave it a diagonal step.
+ * Called when a troop finishes a step. Applies the first sign of the troop's team whose rule
+ * matches its cell and facing. Returns true when a sign changed the troop's facing or gave it a
+ * diagonal step.
  */
 export function applySigns(troop, sim) {
   const c = troop.cell;
   for (const sign of sim.signs) {
+    if (sign.team !== troop.team) continue;
     const def = SIGNS[sign.kind];
-    if (!def.directional) continue;
+    if (!def || !def.directional) continue;
     const here = sign.x === c.x && sign.y === c.y && sign.z === c.z;
     const sd = sign.dir, back = turnAround(sd);
     switch (sign.kind) {
-      case 'turnLeft':
-        if (!here) break;
-        if (troop.dir === sd) { troop.dir = turnLeft(sd); return true; }
-        if (troop.dir === turnRight(sd)) { troop.dir = back; return true; } // reflected: a right turn
+      case 'arrow':
+        // Whatever way it arrived from, a troop on the sign takes the arrow's direction.
+        if (here && troop.dir !== sd) { troop.dir = sd; return true; }
         break;
-      case 'turnRight':
-        if (!here) break;
-        if (troop.dir === sd) { troop.dir = turnRight(sd); return true; }
-        if (troop.dir === turnLeft(sd)) { troop.dir = back; return true; } // reflected: a left turn
-        break;
-      case 'fanOut':
+      case 'fan':
         if (here && troop.dir === sd) return distribute(troop, sign, sd, sim);
-        if (troop.dir === back && funnel(troop, sign, back, 1, sim)) return true;
+        if (troop.dir === back && funnel(troop, sign, back, def.radius, sim)) return true;
         break;
-      case 'divert':
-        if (troop.dir === sd && funnel(troop, sign, sd, def.radius, sim)) return true;
-        if (here && troop.dir === back) return distribute(troop, sign, back, sim);
+      case 'forward':
+        if (!here) break;
+        if (troop.dir === turnLeft(sd) || troop.dir === turnRight(sd)) { troop.dir = sd; return true; }
         break;
       default:
         break;

@@ -1,4 +1,6 @@
 import { dirIndexFromVector } from './pathing.js';
+import { TEAM } from './team.js';
+import { DEFAULT_RULES } from '../rules.js';
 
 /**
  * Guard definitions (idea.md §3.2, notes.md).
@@ -29,21 +31,26 @@ export const GUARD_TYPES = Object.freeze({
  * State machine is idle -> engage (alert/retreat are stretch goals).
  */
 export class Guard {
-  constructor(id, type, x, y, z, dir = 2) {
+   constructor(id, type, x, y, z, dir = 2, rules = DEFAULT_RULES) {
     this.id = id;
     this.type = GUARD_TYPES[type] ? type : 'sentry';
     this.def = GUARD_TYPES[this.type];
     this.cell = { x, y, z };
     this.pos = { x: x + 0.5, y, z: z + 0.5 };
     this.dir = dir;
-    this.maxHp = this.def.hp;
-    this.hp = this.def.hp;
-    this.attack = this.def.attack;
+     // Base stats scaled by the level's rules (guardHpScale / guardDamageScale / guardRangeScale).
+     this.maxHp = Math.max(1, Math.round(this.def.hp * rules.guardHpScale));
+     this.hp = this.maxHp;
+     this.attack = this.def.attack * rules.guardDamageScale;
+     this.rangedAttack = (this.def.rangedAttack ?? this.def.attack) * rules.guardDamageScale;
     this.cooldown = this.def.cooldown;
     this.reach = this.def.reach;
+     this.range = this.def.range * rules.guardRangeScale;
+     this.minRange = (this.def.minRange ?? 0) * rules.guardRangeScale;
     this.attackTimer = 0;
     this.flash = 0;
     this.state = 'idle';
+     this.team = TEAM.ENEMY; // guards only ever engage the player's troops
   }
 
   get alive() {
@@ -57,9 +64,9 @@ export class Guard {
 
     let target = null;
     let ranged = false;
-    if (this.def.reach > 0) target = sim.findTroopNear(this, this.def.reach);
-    if (!target && this.def.range > 0) {
-      target = sim.findTroopInRange(this, this.def.range, this.def.minRange ?? 0);
+     if (this.reach > 0) target = sim.findTroopNear(this, this.reach, TEAM.PLAYER);
+     if (!target && this.range > 0) {
+       target = sim.findTroopInRange(this, this.range, this.minRange, TEAM.PLAYER);
       ranged = !!target;
     }
     if (!target) {
@@ -85,7 +92,7 @@ export class Guard {
       sim.throwGrenade(this, target.cell);
       return;
     }
-    target.takeDamage(this.def.rangedAttack ?? this.attack, sim);
+     target.takeDamage(this.rangedAttack, sim);
     sim.events.push({
       type: 'tracer',
       from: { x: this.pos.x, y: this.pos.y + this.def.muzzle, z: this.pos.z },

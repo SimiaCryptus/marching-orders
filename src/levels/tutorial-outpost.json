@@ -1,21 +1,26 @@
 {
   "name": "Tutorial Outpost",
-   "description": "Get 8 troops into the golden vault. Dig, ladder or build over the dirt wall, steer the column with signs (Q rotates, right-click picks up), and deal with the sentry at the gate, the turret on the wall and the grenadier inside.",
+  "description": "Get 8 troops into the golden vault. Dig, ladder or build over the dirt wall, steer the column with signs (Q or the wheel rotates, right-click picks up), watch for the enemy patrol crossing the yard, and deal with the sentry at the gate, the turret on the wall and the grenadier inside.",
   "size": [40, 14, 12],
   "lethalFall": 4,
   "timeLimit": 0,
   "spawn": { "pos": [2, 3, 6], "dir": [1, 0], "count": 25, "rate": 1.5 },
   "objective": { "type": "reach", "from": [30, 3, 4], "to": [32, 3, 7], "required": 8 },
   "budget": {
-     "crates": { "rifle": 1, "pickaxe": 1, "ladder": 1 },
-     "signs": { "blocker": 3, "turnLeft": 1, "turnRight": 1, "fanOut": 1, "divert": 1 },
-     "roles": { "builder": 2 }
+    "crates": { "rifle": 1, "pickaxe": 1, "ladder": 1 },
+     "signs": { "blocker": 3, "arrow": 2, "fan": 1, "forward": 1 },
+    "roles": { "builder": 2 }
   },
   "guards": [
-     { "type": "sentry",    "pos": [27, 3, 6],  "dir": [-1, 0] },
-     { "type": "turret",    "pos": [24, 10, 5], "dir": [-1, 0] },
-     { "type": "grenadier", "pos": [28, 3, 8],  "dir": [-1, 0] }
+    { "type": "sentry",    "pos": [27, 3, 6],  "dir": [-1, 0] },
+    { "type": "turret",    "pos": [24, 10, 5], "dir": [-1, 0] },
+    { "type": "grenadier", "pos": [28, 3, 8],  "dir": [-1, 0] }
   ],
+  "enemySpawners": [
+    { "pos": [18, 3, 1], "dir": [0, 1], "count": 4, "rate": 8 }
+  ],
+  "signs": [],
+  "crates": [],
   "fills": [
     { "type": "bedrock",   "from": [0, 0, 0],   "to": [39, 0, 11] },
     { "type": "dirt",      "from": [0, 1, 0],   "to": [39, 2, 11] },

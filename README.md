@@ -31,11 +31,20 @@ the clock does.
   they hit something too tall to climb, step over small ledges, and fall
   (sometimes fatally) off high edges. They'll fight anything hostile they
   bump into. Left alone, this behavior alone often isn't enough to win.
-- **Signs.** Small planted markers that redirect the flow of the column —
-  telling it to turn, split into lanes, funnel back together, or simply stop
-  and turn back. This is your main lever for "programming" the crowd's path
-  without controlling anyone individually.
 - **Crates.** Equipment left on the ground that the first troops to walk over
+- **Signs.** Small planted markers that redirect the flow of the column.
+   An **arrow** sign sends every troop that steps on it the way it points; a
+   **fan** sign spreads the column over three lanes (and funnels it back onto
+   one lane when approached from the other side); a **forward** sign
+   straightens out troops that cross it sideways; a **blocker** turns them
+   back. Every sign is a single rotatable placement (Q, the mouse wheel or the
+   rotate button), and while you aim it a ghost of the sign with a ground
+   arrow — or a funnel, for the fan — shows exactly which way the troops will
+   go. This is your main lever for "programming" the crowd's path without
+   controlling anyone individually.
+- **Enemy columns.** Levels can also field enemy drop pods whose troops march
+   just like yours — following their own signs and crates — and fight your
+   column wherever the two meet.
   it will automatically pick up — rifles, pickaxes, ladders. Equipping troops
   this way permanently changes what they can do (dig through walls, climb
   vertical faces, fight at range).
@@ -49,9 +58,28 @@ the clock does.
   first, and it isn't.
 
 There's also a built-in **level designer** — a mode where you can build your
-own towers, place guards and crates, tune the difficulty, and share the
-result as a link others can open and play immediately, with no installation
-or file-sharing required.
+own towers, place guards, enemy pods, signs and crates for either side (a
+Player / Enemy team selector works like a paint), tune the difficulty, and
+share the result as a link others can open and play immediately, with no
+installation or file-sharing required.
+The designer also hosts a **parametric level builder**: pick a seed, a
+difficulty (0–10), how many obstacle segments the approach should have and
+how wide the corridor is — and, if you like, how many troops you get, how
+many enemy pods cross the yard and how big their columns are, how many
+guards hold the keep and how many rifle crates the enemy finds (anything
+left on *auto* follows the difficulty) — press *Generate*, and a complete
+level appears — walls to dig or ladder over, trenches, spike fields that
+force you to steer the column, enemy patrols, turret pillars and a
+garrisoned stone keep with the vault — with a toolkit budget sized to what
+was placed. Every level also carries a set of tunable **rules** — troop and
+guard hit points, pickaxe and ladder charges, rifle range, crate capacity —
+that the designer exposes next to the fall and time limits. Generation is
+deterministic, and the same builder produces the game's **campaign**: a
+standard progression of twelve levels that ramps up in length and
+difficulty. Press **C** (or open `?campaign=N`) to play it; after a win the
+end card offers the next level (**N**). Any campaign level can be loaded
+into the designer, tweaked and shared like a hand-made one.
+
 
 ## Where this idea comes from
 

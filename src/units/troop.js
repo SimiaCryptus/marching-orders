@@ -1,6 +1,8 @@
 import { DIRS, nextStep, turnAround, supported } from './pathing.js';
 import { VOXEL, isLethal } from '../world/voxel.js';
 import { applySigns } from '../items/sign.js';
+import { TEAM } from './team.js';
+import { DEFAULT_RULES } from '../rules.js';
 
 export const TROOP_STATE = Object.freeze({
   WALKING: 'walking',
@@ -24,10 +26,13 @@ const CLIMB_SPEED = 0.8; // fraction of walking speed
  * Base troop: a brawler that marches, turns, steps and falls. Equipment (crates) and
  * roles mutate its stats / behaviour; signs on the ground steer it. Movement is cell-to-cell
  * with interpolation so the simulation stays on the grid while rendering is smooth.
+ * Troops belong to a team: player troops fight guards and enemy troops, enemy troops fight
+ * player troops, and each team only follows its own signs and crates.
  */
 export class Troop {
-  constructor(id, x, y, z, dir) {
+   constructor(id, x, y, z, dir, team = TEAM.PLAYER, rules = DEFAULT_RULES) {
     this.id = id;
+    this.team = team;
     this.cell = { x, y, z };
     this.pos = { x: x + 0.5, y, z: z + 0.5 }; // feet position at the centre of the cell floor
     this.dir = dir;
@@ -35,12 +40,13 @@ export class Troop {
     this.moveSpeed = 0;
     this.state = TROOP_STATE.WALKING;
 
-    // §2.2 stats
-    this.maxHp = 10;
-    this.hp = 10;
+     // §2.2 stats — base values come from the level's rules (rules.js)
+     const hp = team === TEAM.ENEMY ? rules.enemyTroopHp : rules.troopHp;
+     this.maxHp = hp;
+     this.hp = hp;
     this.armor = 0;
-    this.speed = 2.5;
-    this.attack = 2;
+     this.speed = rules.troopSpeed;
+     this.attack = rules.troopAttack;
     this.range = 1;
     this.attackCooldown = 0.8;
     this.morale = 100;
@@ -144,7 +150,8 @@ export class Troop {
     }
     this.fallDistance = 0;
 
-    if (sim.inObjective(this.cell)) {
+    // Only the player's column is trying to reach the vault.
+    if (this.team === TEAM.PLAYER && sim.inObjective(this.cell)) {
       this.state = TROOP_STATE.SAVED;
       if (this.role) this.clearRole(sim);
       sim.troopReachedObjective(this);
@@ -201,7 +208,7 @@ export class Troop {
         }
         break;
       default: // walk / stepUp / stepDown
-        if (sim.isBlocked(step.target) || sim.guardAt(step.target)) {
+        if (sim.isBlocked(step.target, this.team) || sim.guardAt(step.target)) {
           this.dir = turnAround(this.dir);
           break;
         }
@@ -214,8 +221,8 @@ export class Troop {
 
   /** Returns true when the troop is busy fighting this tick. */
   tryCombat(dt, sim) {
-    const guard = sim.findGuardInRange(this);
-    if (!guard) {
+    const target = sim.findHostileInRange(this);
+    if (!target) {
       if (this.state === TROOP_STATE.FIGHTING || this.state === TROOP_STATE.SHOOTING) this.state = TROOP_STATE.WALKING;
       return false;
     }
@@ -223,12 +230,13 @@ export class Troop {
     this.state = ranged ? TROOP_STATE.SHOOTING : TROOP_STATE.FIGHTING;
     if (this.attackTimer <= 0) {
       this.attackTimer = this.attackCooldown;
-      sim.damageGuard(guard, this.attack, this);
+      sim.damageUnit(target, this.attack);
       if (ranged) {
         sim.events.push({
           type: 'tracer',
           from: { x: this.pos.x, y: this.pos.y + 0.7, z: this.pos.z },
-          to: { x: guard.pos.x, y: guard.pos.y + 0.8, z: guard.pos.z },
+          to: { x: target.pos.x, y: target.pos.y + 0.8, z: target.pos.z },
+          color: this.team === TEAM.ENEMY ? 0xff9a7a : undefined,
         });
       }
     }
