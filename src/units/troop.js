@@ -1,4 +1,4 @@
-import { DIRS, nextStep, turnAround, supported } from './pathing.js';
+import { DIRS, nextStep, turnAround, turnLeft, turnRight, supported, wallBeside, stepTarget } from './pathing.js';
 import { VOXEL, isLethal } from '../world/voxel.js';
 import { applySigns } from '../items/sign.js';
 import { TEAM } from './team.js';
@@ -90,6 +90,8 @@ export class Troop {
     this.role = null;
     this.roleData = null;
     this.suspended = null; // { role, data } of a paused role, kept so it can be resumed (see suspendRole)
+    // Wall following (set by signs, see items/sign.js): 0 = off, +1 = wall on the right, -1 = left.
+    this.wallSide = 0;
 
     this.fallDistance = 0;
     this.flash = 0;
@@ -162,6 +164,7 @@ export class Troop {
 
   beginFall(sim) {
     if (this.role) this.clearRole(sim);
+    this.wallSide = 0; // falling off leaves whatever wall it was hugging
     this.state = TROOP_STATE.FALLING;
     const speed = this.parachutes > 0 ? PARACHUTE_FALL_SPEED : FALL_SPEED;
     this.setTarget({ x: this.cell.x, y: this.cell.y - 1, z: this.cell.z }, speed);
@@ -218,6 +221,8 @@ export class Troop {
       sim.troopReachedObjective(this);
       return;
     }
+    // Out in the open with nothing left to hug: stop following.
+     if (this.wallSide && !this.keepsWall(world)) this.wallSide = 0;
     sim.tryPickupCrate(this);
     // Signs steer the column; a troop busy with a role ignores them.
     if (!this.role) applySigns(this, sim);
@@ -225,6 +230,8 @@ export class Troop {
 
   decideStep(dt, sim) {
     const c = this.cell;
+    // A column put onto a wall by a sign takes its turns from the wall, not from going straight.
+    if (this.wallSide) this.hugWall(sim);
     const step = nextStep(sim.world, c.x, c.y, c.z, this.dir, {
       canDig: this.canDig && this.digUses > 0,
       ladders: this.ladders,
@@ -235,7 +242,7 @@ export class Troop {
         this.beginFall(sim);
         break;
       case 'turn':
-        this.dir = turnAround(this.dir);
+        this.dir = this.wallSide ? this.turnAlongWall(sim) : turnAround(this.dir);
         this.state = TROOP_STATE.WALKING;
         this.digTimer = 0;
         break;
@@ -284,13 +291,86 @@ export class Troop {
         break;
       default: // walk / stepUp / stepDown
         if (sim.isBlocked(step.target, this.team) || sim.guardAt(step.target)) {
-          this.dir = turnAround(this.dir);
+          this.dir = this.wallSide ? this.turnAlongWall(sim) : turnAround(this.dir);
           break;
         }
         this.state = TROOP_STATE.WALKING;
         this.setTarget(step.target, sim.moveSpeed(this, step.target)); // slowed on mud
     }
   }
+  // ---- wall following -----------------------------------------------------------
+  //
+  // A sign that puts a troop onto a course along a wall (or along the level bounds) makes it hug
+  // that face: it turns the corners of the wall instead of preferring the straight line, exactly
+  // like a hand kept on the wall. Anything that takes it off the wall — another sign, a fan's
+  // diagonal step, a fall — clears the mode again.
+  /** The facing that turns this troop into the wall it follows. */
+  get towardWall() {
+    return this.wallSide > 0 ? turnRight(this.dir) : turnLeft(this.dir);
+  }
+  /** The facing that turns this troop away from the wall it follows. */
+  get awayFromWall() {
+    return this.wallSide > 0 ? turnLeft(this.dir) : turnRight(this.dir);
+  }
+  /** The cell a plain step that way would land on, or null when it is not walkable for this team. */
+  canStep(sim, dir) {
+    const c = this.cell;
+    const target = stepTarget(sim.world, c.x, c.y, c.z, dir);
+    if (!target || sim.isBlocked(target, this.team) || sim.guardAt(target)) return null;
+    return target;
+  }
+  /** Is there a wall (or the edge of the map) on any side of the cell the troop stands in? */
+  besideWall(world) {
+    const c = this.cell;
+    for (let d = 0; d < 4; d++) if (wallBeside(world, c.x, c.y, c.z, d)) return true;
+    return false;
+  }
+   /**
+    * Is the wall this troop follows still there — beside it, or just around the exterior angle it
+    * has stepped past? A convex corner leaves the followed face diagonally behind for exactly one
+    * cell; the old "any wall beside" test dropped the mode right there, so columns missed every
+    * outside corner and marched off into the open instead of going around the block.
+    */
+   keepsWall(world) {
+     const c = this.cell;
+     if (wallBeside(world, c.x, c.y, c.z, this.towardWall)) return true;
+     return this.wallAroundCorner(world);
+   }
+   /**
+    * The exterior angle: the face is gone from the troop's side, but the cell one step toward it
+    * still has that face behind it — turning the corner keeps the hand on the very same wall.
+    * (After the turn the followed side points back along the old facing, for either hand.)
+    */
+   wallAroundCorner(world) {
+     const c = this.cell;
+     const t = DIRS[this.towardWall];
+     return wallBeside(world, c.x + t.dx, c.y, c.z + t.dz, turnAround(this.dir));
+   }
+  /**
+   * Called after a sign steered this troop: start following the wall it now marches along, or
+   * drop the one it was following when the new course has no wall beside it.
+   */
+  updateWallFollow(world) {
+    const c = this.cell;
+    if (wallBeside(world, c.x, c.y, c.z, turnRight(this.dir))) this.wallSide = 1;
+    else if (wallBeside(world, c.x, c.y, c.z, turnLeft(this.dir))) this.wallSide = -1;
+    else this.wallSide = 0;
+  }
+   /** The followed wall fell away at an exterior angle: turn into it and go around the corner. */
+  hugWall(sim) {
+    const c = this.cell;
+    const toward = this.towardWall;
+    if (wallBeside(sim.world, c.x, c.y, c.z, toward)) return; // still hugging it
+     // Only an exterior angle is worth turning for; a wall that truly ended is dropped on arrival.
+     if (!this.wallAroundCorner(sim.world)) return;
+    if (this.canStep(sim, toward)) this.dir = toward;
+  }
+  /** Blocked ahead while following a wall: turn away from it (the obstacle becomes the new face). */
+  turnAlongWall(sim) {
+    const away = this.awayFromWall;
+    return this.canStep(sim, away) ? away : turnAround(this.dir);
+  }
+
 
   // ---- combat -------------------------------------------------------------------
 
@@ -374,6 +454,16 @@ export class Troop {
     this.roleData = {};
     this.state = TROOP_STATE.WORKING;
     role.start(this, sim);
+  }
+  /**
+   * Equipment that hands out a job (the Builder Crate) grants the role *paused*, with its charges
+   * already set: right-clicking the troop starts it, another right-click pauses it again.
+   */
+  grantRole(role, data) {
+    this.role = null;
+    this.roleData = null;
+    this.suspended = { role, data };
+    if (this.alive && this.state === TROOP_STATE.WORKING) this.state = TROOP_STATE.WALKING;
   }
   /**
    * Pause the current role: the troop marches on like any other, but the job and its progress

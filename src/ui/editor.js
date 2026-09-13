@@ -3,7 +3,6 @@ import { Simulation } from '../simulation.js';
 import { GUARD_TYPES } from '../units/guard.js';
 import { EQUIPMENT, isExclusive } from '../items/equipment.js';
 import { SIGNS, describeSign } from '../items/sign.js';
-import { ROLES } from '../units/roles/index.js';
 import { TEAM, TEAM_LABELS, otherTeam } from '../units/team.js';
 import { DIRS, DIR_LABELS, dirIndexFromVector, turnLeft, turnRight } from '../units/pathing.js';
 import {
@@ -593,12 +592,8 @@ export class Editor {
       f.budget.signs[key] = i;
        signBlock.append(field(def.label, i));
     }
-     const roleBlock = block(rulesCols, 'Player budget — roles');
-    for (const [key, role] of Object.entries(ROLES)) {
-      const i = numberInput({ min: 0, max: 99 }, (v) => { this.level.budget.roles[key] = v; });
-      f.budget.roles[key] = i;
-       roleBlock.append(field(`${role.label}s`, i));
-    }
+     // Roles are no longer placed by the player: the Builder comes out of the Builder Crate above,
+     // and legacy `budget.roles` entries are folded into the crate budget by the level loader.
 
      // ---- Generate tab: pluggable generators (docs/generators.md) and the campaign -------------
      const genCols = cols(P.generate);
@@ -1194,7 +1189,8 @@ export class Editor {
         } else {
           const verb = cr || this.signAt(target) ? 'Replace with' : 'Drop';
            const stack = isExclusive(t.key, this.level.rules) ? '' : ' (stackable: even equipped troops take it)';
-           this.setHint(`${verb} a ${team} ${t.label} at ${c} — the first ${this.level.rules.crateCapacity} ${team} troops over it take its contents${stack}`);
+           const cap = EQUIPMENT[t.key].capacity ?? this.level.rules.crateCapacity;
+           this.setHint(`${verb} a ${team} ${t.label} at ${c} — the first ${cap} ${team} troops over it take its contents${stack}`);
         }
         break;
       }

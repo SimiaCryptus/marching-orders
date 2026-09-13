@@ -46,6 +46,24 @@ function normalizeSignBudget(raw) {
   }
   return out;
 }
+/**
+* Roles that are handed out by a crate now (items/equipment.js). A legacy `budget.roles.<name>`
+* point becomes this many crates of the same name — the Builder used to carry 12 planks, a
+* Builder Crate carries `rules.builderBricks` (5), so one role becomes two crates.
+*/
+const ROLE_CRATES = { builder: 2 };
+/** Folds legacy role budgets into the crate budget; anything else stays a role budget. */
+function normalizeRoleBudget(raw, crates) {
+  const out = {};
+  for (const [k, v] of Object.entries(raw || {})) {
+    if (!Number.isFinite(v) || v <= 0) continue;
+    const per = ROLE_CRATES[k];
+    if (per) crates[k] = (crates[k] ?? 0) + Math.max(1, Math.round(v * per));
+    else out[k] = Math.max(0, Math.round(v));
+  }
+  return out;
+}
+
 
 /**
  * Deep-clones a raw level object, validates the required fields and fills in defaults so the
@@ -81,10 +99,11 @@ export function normalizeLevel(raw) {
   level.lethalFall = isInt(level.lethalFall) && level.lethalFall > 0 ? level.lethalFall : 4;
   level.timeLimit = Number.isFinite(level.timeLimit) && level.timeLimit >= 0 ? level.timeLimit : 0;
    level.rules = normalizeRules(level.rules); // tunable stats (rules.js), defaults when absent
+  const crateBudget = { ...(level.budget?.crates || {}) };
   level.budget = {
-    crates: { ...(level.budget?.crates || {}) },
+    roles: normalizeRoleBudget(level.budget?.roles, crateBudget), // may add builder crates
+    crates: crateBudget,
     signs: normalizeSignBudget(level.budget?.signs),
-    roles: { ...(level.budget?.roles || {}) },
   };
   level.guards = Array.isArray(level.guards)
     ? level.guards

@@ -7,7 +7,6 @@ import { Hud } from './ui/hud.js';
 import { Editor } from './ui/editor.js';
 import { EQUIPMENT } from './items/equipment.js';
 import { SIGNS, describeSign } from './items/sign.js';
-import { ROLES } from './units/roles/index.js';
 import { TEAM } from './units/team.js';
 import { DIR_LABELS, turnLeft, turnRight } from './units/pathing.js';
 
@@ -19,18 +18,19 @@ const DEFAULT_LEVEL_URL = new URL('./levels/tutorial-outpost.json', import.meta.
 
 const MODE = Object.freeze({ PLAY: 'play', EDIT: 'edit' });
 
-/** Player palette: crates, then signs, then roles — hotkeys along the number row (1..9, 0, -, =) in that order. */
+/** Player palette: crates, then signs — hotkeys along the number row (1..9, 0, -, =) in that order. */
 const HOTKEYS = '1234567890-=[';
 const TOOLS = [
   ...Object.entries(EQUIPMENT).map(([key, def]) => ({ id: `crate:${key}`, kind: 'crate', key, label: def.label, color: def.color })),
   ...Object.entries(SIGNS).map(([key, def]) => ({ id: `sign:${key}`, kind: 'sign', key, label: def.label, color: def.color })),
-  ...Object.entries(ROLES).map(([key, role]) => ({ id: `role:${key}`, kind: 'role', key, label: role.label, color: role.color })),
 ].map((t, i) => ({ ...t, hotkey: HOTKEYS[i] ?? null }));
 const HOTKEY_RANGE = `${TOOLS[0].hotkey}…${TOOLS.filter((t) => t.hotkey).pop().hotkey}`;
 
 const DEFAULT_HINT =
-    `Pick a tool (${HOTKEY_RANGE}), then click the map — even through a crowd. Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ` +
-   'right-click or shift-click a placed sign to pick it up, or a builder to pause / resume it. V resets the view, E opens the level designer, C starts the campaign.';
+    `Pick a crate or a sign (${HOTKEY_RANGE}, or ▾ for the whole list), then click the map — even through a crowd. ` +
+   'Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ' +
+   'right-click or shift-click a placed sign to pick it up, or a troop with a builder kit to start / pause its staircase. ' +
+   'V resets the view, M opens the menu.';
 
 /**
  * Startup options from the page URL:
@@ -61,7 +61,7 @@ class Game {
       onToggleIso: () => this.toggleIso(),
       onCycleSpeed: () => this.cycleSpeed(),
       onOpenEditor: () => this.openEditor(),
-      onRotateSign: () => this.rotateSignDir(1),
+      onToggleMenu: (open) => this.toggleMenu(open),
       onResetView: () => this.renderer.resetView(),
        onStartCampaign: () => this.startCampaign(),
        onNextLevel: () => this.playNextCampaignLevel(),
@@ -90,6 +90,8 @@ class Game {
     this.lastTime = performance.now();
     this.ended = false;
     this.signDir = 0; // facing given to the next sign placed (DIRS index)
+    this.menuOpen = false;
+    this.pausedBeforeMenu = false; // pause state the menu restores when it closes
 
     this.hud.setHint(DEFAULT_HINT);
   }
@@ -134,7 +136,6 @@ class Game {
     this.ended = false;
     this.paused = false;
     this.signDir = this.sim.spawn.dir;
-    this.hud.setSignDir(DIR_LABELS[this.signDir]);
     this.hud.hideEnd();
     this.hud.setPaused(false);
     this.hud.showToast(this.level.description || `Level: ${this.level.name}`, 6000);
@@ -146,6 +147,7 @@ class Game {
   playLevel(level, { keepCamera = false } = {}) {
     this.level = level;
     this.mode = MODE.PLAY;
+    this.toggleMenu(false);
     this.editor.close();
     this.hud.setVisible(true);
     this.hud.setHint(DEFAULT_HINT);
@@ -154,6 +156,7 @@ class Game {
 
   openEditor() {
     if (this.mode === MODE.EDIT) return;
+    this.toggleMenu(false);
     this.mode = MODE.EDIT;
     this.selectTool(null);
     this.renderer.setCursor(null);
@@ -229,7 +232,6 @@ class Game {
   /** Rotate the facing given to the next sign: clockwise for positive steps. */
   rotateSignDir(steps = 1) {
     this.signDir = steps < 0 ? turnLeft(this.signDir) : turnRight(this.signDir);
-    this.hud.setSignDir(DIR_LABELS[this.signDir]);
     this.hud.showToast(`Next sign faces ${DIR_LABELS[this.signDir]}.`, 1200);
     this.onHover(this.hover);
   }
@@ -351,23 +353,12 @@ class Game {
         this.renderer.setCursor(null);
         this.hud.setHint(`Click the top of a floor voxel (or a troop standing on it) to plant a ${label}`);
       }
-    } else {
-      const troop = this.findTroopFromHit(hit);
-      if (troop) {
-        this.renderer.setCursor(troop.cell, 0xffd75a);
-        const resume = troop.suspended && troop.suspended.role === ROLES[this.tool.key];
-        this.hud.setHint(resume
-          ? `Resume ${this.roleSummary(troop)} on troop #${troop.id} (no cost)`
-          : `Assign ${label} to troop #${troop.id}`);
-      } else {
-        this.renderer.setCursor(null);
-        this.hud.setHint(`Click a troop (or the voxel it stands on) to make it a ${label}`);
-      }
     }
   }
 
   onClick(hit, e) {
     if (this.mode === MODE.EDIT) { this.editor.onClick(hit, e); return; }
+    if (this.menuOpen) return;
     const sim = this.sim;
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return;
     if (e && e.shiftKey) { if (!this.toggleRoleFromHit(hit)) this.pickUpSign(hit); return; }
@@ -392,10 +383,6 @@ class Game {
       } else {
         this.hud.showToast('Click the top of a floor voxel to plant a sign.', 1500);
       }
-    } else {
-      const troop = this.findTroopFromHit(hit);
-      placed = troop ? sim.assignRole(troop, this.tool.key) : false;
-      if (!placed) this.hud.showToast(troop ? `Can't assign ${this.tool.label} right now.` : 'No troop there.', 1500);
     }
     if (placed && sim.budgetFor(this.tool.kind, this.tool.key) <= 0) this.selectTool(null);
     this.onHover(hit);
@@ -403,6 +390,7 @@ class Game {
 
   onRightClick(hit) {
     if (this.mode === MODE.EDIT) { this.editor.onRightClick(hit); return; }
+    if (this.menuOpen) return;
     if (!this.toggleRoleFromHit(hit)) this.pickUpSign(hit);
   }
   /**
@@ -451,7 +439,6 @@ class Game {
     if (sign.team !== TEAM.PLAYER) { this.hud.showToast('Enemy signs cannot be picked up.', 1500); return; }
     sim.pickUpSign(sign);
     this.signDir = sign.dir; // re-placing it keeps the facing unless you rotate
-    this.hud.setSignDir(DIR_LABELS[this.signDir]);
     this.hud.showToast(`${sign.def.label} returned to inventory.`, 1500);
     this.onHover(hit);
   }
@@ -461,6 +448,18 @@ class Game {
       if (this.editor.onKey(e)) return;
       if (e.code === 'KeyI') this.toggleIso();
       if (e.code === 'KeyV') this.renderer.resetView();
+      return;
+    }
+    if (this.menuOpen) {
+      // While the menu is up only its own shortcuts answer.
+      switch (e.code) {
+        case 'Escape':
+        case 'KeyM': this.toggleMenu(false); break;
+        case 'KeyR': this.toggleMenu(false); this.reset({ keepCamera: true }); break;
+        case 'KeyC': this.toggleMenu(false); this.startCampaign(); break;
+        case 'KeyE': this.toggleMenu(false); this.openEditor(); break;
+        default: break;
+      }
       return;
     }
      const tool = TOOLS.find((t) => t.hotkey && t.hotkey === e.key);
@@ -473,6 +472,7 @@ class Game {
       case 'KeyV': this.renderer.resetView(); break;
       case 'KeyR': this.reset({ keepCamera: true }); break;
       case 'KeyE': this.openEditor(); break;
+       case 'KeyM': this.toggleMenu(true); break;
        case 'KeyC': this.startCampaign(); break;
        case 'KeyN':
          if (this.ended && this.sim && this.sim.status === GAME_STATUS.WON) this.playNextCampaignLevel();
@@ -493,8 +493,25 @@ class Game {
   }
 
   togglePause() {
-    this.paused = !this.paused;
-    this.hud.setPaused(this.paused);
+    this.setPaused(!this.paused);
+  }
+
+  setPaused(paused) {
+    this.paused = paused;
+    this.hud.setPaused(paused);
+  }
+
+  /** The menu holds the assault while it is open and restores the previous pause state on close. */
+  toggleMenu(open = !this.menuOpen) {
+    if (open === this.menuOpen) { this.hud.setMenuOpen(open); return; }
+    this.menuOpen = open;
+    if (open) {
+      this.pausedBeforeMenu = this.paused;
+      this.setPaused(true);
+    } else {
+      this.setPaused(this.pausedBeforeMenu);
+    }
+    this.hud.setMenuOpen(open);
   }
 
   cycleSpeed() {

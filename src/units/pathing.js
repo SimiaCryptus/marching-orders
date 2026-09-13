@@ -90,3 +90,25 @@ export function nextStep(world, x, y, z, dirIndex, opts = {}) {
   }
   return { action: 'walk', target: { x: tx, y, z: tz } }; // walks off the ledge; gravity takes over
 }
+/**
+* Is the cell one step along `dirIndex` a wall for a unit standing in air cell (x, y, z)?
+* Anything solid at the unit's own level counts, and so does the edge of the map: the level
+* bounds are a face a column can follow like any other (see troop.js wall following).
+*/
+export function wallBeside(world, x, y, z, dirIndex) {
+  const { dx, dz } = DIRS[dirIndex];
+  const tx = x + dx, tz = z + dz;
+  if (tx < 0 || tx >= world.w || tz < 0 || tz >= world.d) return true;
+  return world.isSolid(tx, y, tz);
+}
+/**
+* The cell a plain step along `dirIndex` lands on (walk / step up / step down onto solid ground),
+* or null when that way is a wall, a gap, the void or off the map. Wall following uses this so a
+* hugging column never digs, builds or walks off a ledge just to keep its wall.
+*/
+export function stepTarget(world, x, y, z, dirIndex) {
+  const s = nextStep(world, x, y, z, dirIndex);
+  if (s.action !== 'walk' && s.action !== 'stepUp' && s.action !== 'stepDown') return null;
+  const t = s.target;
+  return supported(world, t.x, t.y, t.z) ? t : null;
+}

@@ -25,6 +25,7 @@ export const RULE_DEFS = Object.freeze([
   { key: 'pickaxeCharges', label: 'Pickaxe charges', min: 1, max: 999, step: 1, def: 10, group: KITS },
   { key: 'ladderCharges', label: 'Ladder segments per kit', min: 1, max: 99, step: 1, def: 3, group: KITS },
   { key: 'bridgeCharges', label: 'Bridge planks per kit', min: 1, max: 99, step: 1, def: 4, group: KITS },
+  { key: 'builderBricks', label: 'Planks per builder crate', min: 1, max: 99, step: 1, def: 5, group: KITS },
   // Medic kit: heals the nearest wounded troop of its team within range, one charge per heal
   { key: 'medicCharges', label: 'Medic heal charges', min: 1, max: 99, step: 1, def: 6, group: 'Medic' },
   { key: 'medicHeal', label: 'HP healed per charge', min: 1, max: 99, step: 1, def: 4, group: 'Medic' },
@@ -54,6 +55,7 @@ export const RULE_DEFS = Object.freeze([
   { key: 'grenadeExclusive', label: 'Grenades', type: 'boolean', def: true, group: EXCLUSIVE },
   { key: 'armorExclusive', label: 'Armor', type: 'boolean', def: false, group: EXCLUSIVE },
   { key: 'parachuteExclusive', label: 'Parachute', type: 'boolean', def: false, group: EXCLUSIVE },
+  { key: 'builderExclusive', label: 'Builder kit', type: 'boolean', def: false, group: EXCLUSIVE },
 ]);
 
 export const DEFAULT_RULES = Object.freeze(Object.fromEntries(RULE_DEFS.map((r) => [r.key, r.def])));

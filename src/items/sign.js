@@ -17,6 +17,9 @@ const QUARTER = Math.PI / 2;
  *   forward  — troops crossing it sideways turn to march its way; troops already moving along
  *              its axis pass through (a one-way arrow that leaves the return trip alone).
  *   blocker  — not directional: troops refuse to step onto it and turn around.
+* A sign that sets a troop marching along a wall (or along the level bounds) also puts it into
+* wall-following mode: from then on it takes its turns from that wall instead of preferring the
+* straight line, until something — another sign, a fan's diagonal step, a fall — takes it off.
  * `arrows` are rendering hints for the plate in the sign's local frame: yaw in radians
  * (+ = left) and a lateral offset `ox` (+ = left).
  */
@@ -116,7 +119,10 @@ function distribute(troop, sign, fd, sim) {
   const side = LEGS[sign.counter++ % LEGS.length];
   if (side === 0) return true;
   const target = diagonalTarget(sim, troop.cell, fd, side, troop.team);
-  if (target) troop.setTarget(target, sim.moveSpeed(troop, target));
+  if (target) {
+    troop.wallSide = 0; // fanned off its lane: it is no longer following anything
+    troop.setTarget(target, sim.moveSpeed(troop, target));
+  }
   return true;
 }
 
@@ -134,6 +140,7 @@ function funnel(troop, sign, fd, radius, sim) {
   if (Math.abs(troop.cell.y - sign.y) > 1) return false;
   const target = diagonalTarget(sim, troop.cell, fd, across > 0 ? -1 : 1, troop.team);
   if (!target) return false;
+  troop.wallSide = 0; // funnelled across lanes: it leaves whatever wall it was hugging
   troop.setTarget(target, sim.moveSpeed(troop, target));
   return true;
 }
@@ -154,7 +161,11 @@ export function applySigns(troop, sim) {
     switch (sign.kind) {
       case 'arrow':
         // Whatever way it arrived from, a troop on the sign takes the arrow's direction.
-        if (here && troop.dir !== sd) { troop.dir = sd; return true; }
+        if (here && troop.dir !== sd) {
+          troop.dir = sd;
+          troop.updateWallFollow(sim.world); // marching along a wall now? then hug it
+          return true;
+        }
         break;
       case 'fan':
         if (here && troop.dir === sd) return distribute(troop, sign, sd, sim);
@@ -162,7 +173,11 @@ export function applySigns(troop, sim) {
         break;
       case 'forward':
         if (!here) break;
-        if (troop.dir === turnLeft(sd) || troop.dir === turnRight(sd)) { troop.dir = sd; return true; }
+        if (troop.dir === turnLeft(sd) || troop.dir === turnRight(sd)) {
+          troop.dir = sd;
+          troop.updateWallFollow(sim.world);
+          return true;
+        }
         break;
       default:
         break;

@@ -1,4 +1,5 @@
 import { DEFAULT_RULES } from '../rules.js';
+import { ROLES } from '../units/roles/index.js';
 
 /**
  * Equipment granted by weapon crates. `apply` permanently mutates a troop's stats using the
@@ -10,7 +11,8 @@ import { DEFAULT_RULES } from '../rules.js';
  * the crate's own `exclusive` flag; see `isExclusive`. Consumable kits (pickaxe, ladder, medic,
 * bridge, grenades, armor, parachute) are dropped once used up, which frees the slot again. Whatever a
  * troop picks up it keeps: effects of several kits combine. How many troops a crate serves is
- * `rules.crateCapacity` unless the crate says otherwise.
+* `rules.crateCapacity` unless the kit declares its own `capacity` (the Builder Crate serves one)
+* or the crate says otherwise.
  */
 export const EQUIPMENT = Object.freeze({
   rifle: {
@@ -93,6 +95,17 @@ export const EQUIPMENT = Object.freeze({
     apply(troop, rules = DEFAULT_RULES) {
       // Survives falls beyond the lethal height (one charge per saved landing) and floats down slower.
       troop.parachutes = rules.parachuteCharges;
+    },
+  },
+  builder: {
+    name: 'Builder Kit',
+    label: 'Builder Crate',
+    color: 0xf0d040,
+    capacity: 1, // one troop takes the job
+    apply(troop, rules = DEFAULT_RULES) {
+      // Hands out a *paused* Builder job with `builderBricks` planks: right-click (or shift-click)
+      // the troop to start the staircase, right-click again to pause it (units/roles/builder.js).
+      troop.grantRole(ROLES.builder, { bricks: rules.builderBricks, placed: 0, timer: 0 });
     },
   },
 });

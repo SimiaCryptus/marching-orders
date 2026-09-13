@@ -77,7 +77,7 @@ export class Simulation {
       if (!def) continue;
        this.crates.push(new Crate(
          this.nextId++, c.kind, c.pos[0], c.pos[1], c.pos[2],
-         c.capacity ?? this.rules.crateCapacity, c.team, c.exclusive ?? null,
+         c.capacity ?? def.capacity ?? this.rules.crateCapacity, c.team, c.exclusive ?? null,
        ));
     }
   }
@@ -417,7 +417,9 @@ export class Simulation {
     if (!this.canPlaceCrate(kind, c)) return false;
     this.budget.crates[kind]--;
     const def = EQUIPMENT[kind];
-     this.crates.push(new Crate(this.nextId++, kind, c.x, c.y, c.z, this.rules.crateCapacity, TEAM.PLAYER));
+     // Most kits serve `rules.crateCapacity` troops; a kit may declare its own (the Builder Crate serves one).
+     const capacity = def.capacity ?? this.rules.crateCapacity;
+     this.crates.push(new Crate(this.nextId++, kind, c.x, c.y, c.z, capacity, TEAM.PLAYER));
     this.events.push({ type: 'crate', pos: center(c), color: def.color });
     return true;
   }
