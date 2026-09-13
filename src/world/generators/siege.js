@@ -8,7 +8,7 @@ import { mulberry32, plural } from './util.js';
  *
  * Every segment is one obstacle picked from a difficulty-gated catalogue (dirt walls to dig or
  * ladder over, trenches to fall into and climb out of, spike fields the column must be steered
- * around, turret pillars). Enemy drop pods are spread along the approach so their columns cross
+* around, mud flats that slow it, turret pillars). Enemy drop pods are spread along the approach so their columns cross
  * the player's path, the keep is garrisoned from a fixed roster of posts, and the player's budget
  * is derived from the obstacles and hostiles actually placed, so a generated level is always
  * solvable with the tools it hands out.
@@ -79,6 +79,7 @@ export const SEGMENT_KINDS = Object.freeze([
   { kind: 'wall', label: 'dirt wall', minDifficulty: 0, weight: 3 },
   { kind: 'spikes', label: 'spike field', minDifficulty: 1, weight: 3 },
   { kind: 'pit', label: 'trench', minDifficulty: 2, weight: 2 },
+  { kind: 'mud', label: 'mud flat', minDifficulty: 2, weight: 2 },
   { kind: 'tallWall', label: 'tall wall', minDifficulty: 3, weight: 2 },
   { kind: 'pillar', label: 'turret pillar', minDifficulty: 5, weight: 1, max: 3 },
 ]);
@@ -121,7 +122,7 @@ export function build(p) {
     { type: 'dirt', from: [0, 1, 0], to: [w - 1, FLOOR_Y - 1, d - 1] },
   ];
   const guards = [], enemySpawners = [], crates = [], signs = [];
-  const counts = { wall: 0, tallWall: 0, spikes: 0, pit: 0, pillar: 0 };
+  const counts = { wall: 0, tallWall: 0, spikes: 0, pit: 0, mud: 0, pillar: 0 };
 
   // ---- obstacle segments ----------------------------------------------------------------
   const kinds = pickSegments(rng, p.difficulty, p.segments);
@@ -146,6 +147,9 @@ export function build(p) {
       }
       case 'pit': // a two-deep trench: troops drop in and face a two-high wall on the far side
         fills.push({ type: 'air', from: [x, 1, 0], to: [x + 1, FLOOR_Y - 1, d - 1] });
+        break;
+      case 'mud': // four cells of mud across the yard: the column crawls while patrols and turrets get more shots
+        fills.push({ type: 'mud', from: [x + 1, FLOOR_Y - 1, 0], to: [x + 4, FLOOR_Y - 1, d - 1] });
         break;
       case 'pillar': {
         // A stone pillar off the centre lane with a turret on top: rifles or a detour.
@@ -220,6 +224,7 @@ export function build(p) {
     crates: {
       pickaxe: Math.max(1, Math.ceil(nWalls / 2)),
       ladder: nWalls > 0 ? 1 : 0,
+      bridge: counts.pit > 0 ? 1 : 0,        // planks across the trench instead of dropping in
       rifle: hostiles > 0 ? 1 + Math.floor(hostiles / 3) : 0,
        medic: hostiles >= 3 ? 1 : 0,          // a garrison worth patching the column up for
        grenade: keepGuards >= 3 ? 1 : 0,      // bunched defenders inside the keep

@@ -20,7 +20,7 @@ const DEFAULT_LEVEL_URL = new URL('./levels/tutorial-outpost.json', import.meta.
 const MODE = Object.freeze({ PLAY: 'play', EDIT: 'edit' });
 
 /** Player palette: crates, then signs, then roles — hotkeys along the number row (1..9, 0, -, =) in that order. */
-const HOTKEYS = '1234567890-=';
+const HOTKEYS = '1234567890-=[';
 const TOOLS = [
   ...Object.entries(EQUIPMENT).map(([key, def]) => ({ id: `crate:${key}`, kind: 'crate', key, label: def.label, color: def.color })),
   ...Object.entries(SIGNS).map(([key, def]) => ({ id: `sign:${key}`, kind: 'sign', key, label: def.label, color: def.color })),
@@ -30,7 +30,7 @@ const HOTKEY_RANGE = `${TOOLS[0].hotkey}…${TOOLS.filter((t) => t.hotkey).pop()
 
 const DEFAULT_HINT =
     `Pick a tool (${HOTKEY_RANGE}), then click the map — even through a crowd. Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ` +
-   'right-click or shift-click a placed sign to pick it up. V resets the view, E opens the level designer, C starts the campaign.';
+   'right-click or shift-click a placed sign to pick it up, or a builder to pause / resume it. V resets the view, E opens the level designer, C starts the campaign.';
 
 /**
  * Startup options from the page URL:
@@ -277,6 +277,15 @@ class Game {
     const facing = sign.def.directional ? ` facing ${DIR_LABELS[sign.dir]}` : '';
     return `${sign.def.label}${facing}`;
   }
+  /** "Builder — 7 planks left" / "Builder (paused) — 7 planks left" for a troop with an active or paused role. */
+  roleSummary(troop) {
+    const role = troop.role || (troop.suspended && troop.suspended.role);
+    if (!role) return '';
+    const data = troop.role ? troop.roleData : troop.suspended.data;
+    const progress = role.progress ? ` — ${role.progress(data)}` : '';
+    return `${role.label}${troop.role ? '' : ' (paused)'}${progress}`;
+  }
+
 
   onHover(hit) {
     if (this.mode === MODE.EDIT) { this.editor.onHover(hit); return; }
@@ -293,7 +302,11 @@ class Game {
     const cell = this.floorCellFromHit(hit);
 
     if (!this.tool) {
-      if (sign) {
+      const worker = this.findTroopFromHit(hit);
+      if (worker && (worker.role || worker.suspended)) {
+        this.renderer.setCursor(worker.cell, 0xffd75a);
+        this.hud.setHint(`Troop #${worker.id}: ${this.roleSummary(worker)} — right-click or shift-click ${worker.role ? 'pauses' : 'resumes'} it`);
+      } else if (sign) {
         this.renderer.setCursor(sign.cell, own ? 0xffd75a : 0xff6a6a);
         this.hud.setHint(own
           ? `${this.signSummary(sign)} — ${describeSign(sign.kind, sign.dir)}. Q / wheel rotates, right-click or shift-click picks it up`
@@ -342,7 +355,10 @@ class Game {
       const troop = this.findTroopFromHit(hit);
       if (troop) {
         this.renderer.setCursor(troop.cell, 0xffd75a);
-        this.hud.setHint(`Assign ${label} to troop #${troop.id}`);
+        const resume = troop.suspended && troop.suspended.role === ROLES[this.tool.key];
+        this.hud.setHint(resume
+          ? `Resume ${this.roleSummary(troop)} on troop #${troop.id} (no cost)`
+          : `Assign ${label} to troop #${troop.id}`);
       } else {
         this.renderer.setCursor(null);
         this.hud.setHint(`Click a troop (or the voxel it stands on) to make it a ${label}`);
@@ -354,7 +370,7 @@ class Game {
     if (this.mode === MODE.EDIT) { this.editor.onClick(hit, e); return; }
     const sim = this.sim;
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return;
-    if (e && e.shiftKey) { this.pickUpSign(hit); return; }
+    if (e && e.shiftKey) { if (!this.toggleRoleFromHit(hit)) this.pickUpSign(hit); return; }
     if (!this.tool) {
        this.hud.showToast(`Select a tool first (keys ${HOTKEY_RANGE}). Right-click or shift-click a sign to pick it up.`, 2000);
       return;
@@ -387,8 +403,24 @@ class Game {
 
   onRightClick(hit) {
     if (this.mode === MODE.EDIT) { this.editor.onRightClick(hit); return; }
-    this.pickUpSign(hit);
+    if (!this.toggleRoleFromHit(hit)) this.pickUpSign(hit);
   }
+  /**
+   * Right-click / shift-click on a troop with a job: pause it (it marches on, keeping its
+   * planks) or resume a paused one. Returns false when there was no such troop under the cursor.
+   */
+  toggleRoleFromHit(hit) {
+    const sim = this.sim;
+    if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return false;
+    const troop = this.findTroopFromHit(hit);
+    if (!troop || !(troop.role || troop.suspended)) return false;
+    const result = sim.toggleRole(troop);
+    if (result) this.hud.showToast(`Troop #${troop.id}: ${this.roleSummary(troop)} — ${result}.`, 1500);
+    else this.hud.showToast(`Can't change troop #${troop.id}'s job right now.`, 1500);
+    this.onHover(hit);
+    return true;
+  }
+
 
   /**
    * Mouse wheel: rotates the sign under the cursor (with no tool or a sign tool selected) or the

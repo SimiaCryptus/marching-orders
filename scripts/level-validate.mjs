@@ -348,7 +348,11 @@ function reachable(level, world, tools) {
       }
       if (solid(tx, y - 1, tz)) push(tx, y, tz);                 // walk
       else if (solid(tx, y - 2, tz)) push(tx, y - 1, tz);        // stepDown
-      else { const l = land(tx, y, tz); if (l) push(...l); }     // walk off the ledge
+      else {
+        if (tools.bridge) push(tx, y, tz);                       // bridge kit: a plank across the gap
+        const l = land(tx, y, tz);                               // or walk off the ledge
+        if (l) push(...l);
+      }
     }
   }
   return false;
@@ -359,10 +363,11 @@ function checkReachability(level, world, rep) {
   const tools = {
     dig: has('pickaxe'),
     ladder: has('ladder') || (level.budget.roles.builder ?? 0) > 0,
+    bridge: has('bridge'),
     parachute: has('parachute'),
   };
   const granted = Object.entries(tools).filter(([, v]) => v).map(([k]) => k);
-  const open = reachable(level, world, { dig: false, ladder: false, parachute: false });
+  const open = reachable(level, world, { dig: false, ladder: false, bridge: false, parachute: false });
   if (open) {
     if (granted.length) rep.warn('objective', 'reachable from the pod without any tools (steering aside) — the obstacles can be walked around');
     else rep.note('objective', 'reachable from the pod on foot');

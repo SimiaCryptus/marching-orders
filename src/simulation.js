@@ -6,7 +6,7 @@ import { Sign, SIGNS } from './items/sign.js';
 import { ROLES } from './units/roles/index.js';
 import { TEAM } from './units/team.js';
 import { dirIndexFromVector } from './units/pathing.js';
-import { VOXEL } from './world/voxel.js';
+import { VOXEL, isSlow } from './world/voxel.js';
 import { DEFAULT_RULES } from './rules.js';
 
 export const GAME_STATUS = Object.freeze({ PLAYING: 'playing', WON: 'won', LOST: 'lost' });
@@ -168,6 +168,12 @@ export class Simulation {
   signById(id) {
     return this.signs.find((s) => s.id === id) || null;
   }
+  /** Walking speed of `troop` for a step into `cell`: its base speed, slowed on mud (rules.mudSpeed). */
+  moveSpeed(troop, cell) {
+    const below = this.world.get(cell.x, cell.y - 1, cell.z);
+    return troop.speed * (isSlow(below) ? this.rules.mudSpeed : 1);
+  }
+
 
   /**
    * Nearest hostile unit a troop can hit: adjacent for melee; anything within range and line of
@@ -453,14 +459,42 @@ export class Simulation {
     const role = ROLES[roleName];
     if (!role || !troop || !troop.alive || troop.team !== TEAM.PLAYER) return false;
     if (this.status !== GAME_STATUS.PLAYING) return false;
+    if (troop.state === TROOP_STATE.FALLING || troop.state === TROOP_STATE.CLIMBING) return false;
+    if (troop.suspended && troop.suspended.role === role) {
+      // Resuming a paused job of the same kind costs nothing.
+      troop.resumeRole(this);
+      this.events.push({ type: 'role', pos: { ...troop.pos }, color: role.color });
+      return true;
+    }
     if (this.budgetFor('role', roleName) <= 0) return false;
     if (troop.role === role) return false;
-    if (troop.state === TROOP_STATE.FALLING || troop.state === TROOP_STATE.CLIMBING) return false;
     this.budget.roles[roleName]--;
     troop.setRole(role, this);
     this.events.push({ type: 'role', pos: { ...troop.pos }, color: role.color });
     return true;
   }
+  /**
+   * Pause the troop's role (it keeps its progress, e.g. a builder's planks) or resume a paused
+   * one. Returns 'paused' | 'resumed', or null when there was nothing to toggle / it cannot be
+   * resumed right now (mid-fall or on a ladder).
+   */
+  toggleRole(troop) {
+    if (!troop || !troop.alive || troop.team !== TEAM.PLAYER || this.status !== GAME_STATUS.PLAYING) return null;
+    if (troop.role) {
+      troop.suspendRole(this);
+      this.events.push({ type: 'role', pos: { ...troop.pos }, color: 0x9aa3b8 });
+      return 'paused';
+    }
+    if (troop.suspended) {
+      if (troop.state === TROOP_STATE.FALLING || troop.state === TROOP_STATE.CLIMBING) return null;
+      const role = troop.suspended.role;
+      troop.resumeRole(this);
+      this.events.push({ type: 'role', pos: { ...troop.pos }, color: role.color });
+      return 'resumed';
+    }
+    return null;
+  }
+
 
   // ---- end conditions -------------------------------------------------------------
 

@@ -208,7 +208,7 @@ export function newBlankLevel(w = 32, h = 12, d = 12) {
       required: 5,
     },
     budget: {
-       crates: { rifle: 1, pickaxe: 1, ladder: 1, medic: 1, grenade: 1, armor: 1, parachute: 1 },
+       crates: { rifle: 1, pickaxe: 1, ladder: 1, bridge: 1, medic: 1, grenade: 1, armor: 1, parachute: 1 },
        signs: { blocker: 2, arrow: 2, fan: 1, forward: 1 },
       roles: { builder: 2 },
     },

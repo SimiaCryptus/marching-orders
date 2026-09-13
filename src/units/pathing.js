@@ -38,7 +38,8 @@ export function supported(world, x, y, z) {
  * Grid step / fall / turn rules shared by troops and guards (idea.md §2.1).
  * The unit stands in air cell (x, y, z) on top of solid (x, y-1, z) or on a ladder.
  *
- * opts: { canDig, ladders }  — pickaxe available / ladder segments the unit may still place.
+* opts: { canDig, ladders, bridges } — pickaxe available / ladder segments / bridge planks the
+*                                      unit may still place.
  *
  * Returns { action, target } with action one of:
  *   'fall'      — nothing below, drop one cell
@@ -48,6 +49,7 @@ export function supported(world, x, y, z) {
  *   'climb'     — tall wall ahead and a ladder above: climb one cell
  *   'climbDown' — hanging on a ladder facing away from the wall: descend one cell
  *   'ladder'    — tall wall ahead and the unit can extend a ladder into the cell above
+*   'bridge'    — a gap ahead (a drop of two or more) and the unit can lay a plank across it
  *   'dig'       — soft wall ahead and the unit can dig
  *   'turn'      — wall taller than one voxel, reverse facing
  */
@@ -82,5 +84,9 @@ export function nextStep(world, x, y, z, dirIndex, opts = {}) {
   }
   if (world.isSolid(tx, y - 1, tz)) return { action: 'walk', target: { x: tx, y, z: tz } };
   if (world.isSolid(tx, y - 2, tz)) return { action: 'stepDown', target: { x: tx, y: y - 1, z: tz } };
+  // A real gap: a bridge kit lays a plank at floor level instead of stepping into the void.
+  if ((opts.bridges ?? 0) > 0 && world.inBounds(tx, y - 1, tz) && world.get(tx, y - 1, tz) === VOXEL.AIR) {
+    return { action: 'bridge', target: { x: tx, y: y - 1, z: tz } };
+  }
   return { action: 'walk', target: { x: tx, y, z: tz } }; // walks off the ledge; gravity takes over
 }

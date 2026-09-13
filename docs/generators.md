@@ -14,6 +14,7 @@ src/world/
     util.js                 shared helpers (seeded RNG, clampInt, plural, …)
     siege.js                reference implementation (the campaign's generator)
     arena.js                small second generator; shows select / boolean parameters
+    maze.js                 labyrinth: perfect maze, trapped dead ends, mud, programmed enemy patrols
 docs/generators.md          this document
 ```
 
@@ -147,6 +148,7 @@ Voxel names accepted in `fills[].type` and the meaning of every level field are 
    export const GENERATORS = Object.freeze({
      siege,
      arena,
+     maze,
      caves,   // <- the new line
    });
    ```

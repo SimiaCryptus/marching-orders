@@ -8,10 +8,12 @@
  */
 import siege from './siege.js';
 import arena from './arena.js';
+import maze from './maze.js';
 
 export const GENERATORS = Object.freeze({
   siege,
   arena,
+  maze,
 });
 
 /** Used when a level does not say which generator made it, and as the designer's initial choice. */

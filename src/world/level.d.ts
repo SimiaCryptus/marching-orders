@@ -33,6 +33,7 @@ export type Team = 'player' | 'enemy';
  *   dirt       — the soft block: diggable with a pickaxe, the standard obstacle material.
  *   stone      — hard structural block: not diggable, forces detours / gates / ladders.
  *   plank      — placed by the Builder role; solid.
+*   mud        — solid floor that slows every step taken onto it (rules.mudSpeed); diggable.
  *   ladder     — climbable, also counts as support (troops can stand "in" it).
  *   spikes     — lethal on contact: a troop that arrives in the cell *above* spikes dies.
  *   objective  — solid marker block, drawn as the vault floor. Purely cosmetic/semantic:
@@ -40,7 +41,7 @@ export type Team = 'player' | 'enemy';
  * Always verify unusual names against `VOXEL_BY_NAME`; an unknown name throws at build time.
  */
 export type VoxelName =
-  | 'air' | 'bedrock' | 'dirt' | 'stone' | 'plank' | 'ladder' | 'spikes' | 'objective';
+  | 'air' | 'bedrock' | 'dirt' | 'stone' | 'plank' | 'ladder' | 'spikes' | 'objective' | 'mud';
 
 /** Numeric voxel ids as stored in `World.data` (see `VOXEL` / `VOXEL_TYPES`). */
 export type VoxelId = number;
@@ -49,7 +50,7 @@ export type GuardType = 'sentry' | 'turret' | 'grenadier';
 export type SignKind = 'blocker' | 'arrow' | 'fan' | 'forward';
 /** Accepted on input and rewritten by the loader: turnLeft|turnRight|turn -> arrow, fanOut|divert -> fan. */
 export type LegacySignKind = 'turnLeft' | 'turnRight' | 'turn' | 'fanOut' | 'divert';
-export type EquipmentKind = 'rifle' | 'pickaxe' | 'ladder' | 'medic' | 'grenade' | 'armor' | 'parachute';
+export type EquipmentKind = 'rifle' | 'pickaxe' | 'ladder' | 'bridge' | 'medic' | 'grenade' | 'armor' | 'parachute';
 export type RoleName = 'builder';
 
 // ---------------------------------------------------------------------------------------
@@ -60,12 +61,16 @@ export interface Rules {
   /** def 10, 1..999 */            troopHp: number;
   /** def 10, 1..999 */            enemyTroopHp: number;
   /** def 2.5, 0.5..10 cells/s */  troopSpeed: number;
+  /** def 2.5, 0.5..10 cells/s */  enemyTroopSpeed: number;
+  /** def 1, 0.5..2.5 (body size of enemy troops, cosmetic) */ enemyTroopScale: number;
   /** def 2, 0..99 */              troopAttack: number;
   /** def 8, 2..32 cells */        rifleRange: number;
   /** def 3, 0..99 */              rifleAttack: number;
   /** def 10, 1..999 voxels */     pickaxeCharges: number;
   /** def 3, 1..99 segments */     ladderCharges: number;
+  /** def 4, 1..99 planks */       bridgeCharges: number;
   /** def 5, 1..99 troops */       crateCapacity: number;
+  /** def 0.5, 0.1..1 — speed multiplier for steps onto mud */ mudSpeed: number;
    /** def 6, 1..99 heals */        medicCharges: number;
    /** def 4, 1..99 HP per heal */  medicHeal: number;
    /** def 3, 1..16 cells */        medicRange: number;
@@ -89,6 +94,7 @@ export interface Rules {
    rifleExclusive: boolean;
    pickaxeExclusive: boolean;
    ladderExclusive: boolean;
+   bridgeExclusive: boolean;
    medicExclusive: boolean;
    grenadeExclusive: boolean;
    armorExclusive: boolean;

@@ -116,7 +116,7 @@ function distribute(troop, sign, fd, sim) {
   const side = LEGS[sign.counter++ % LEGS.length];
   if (side === 0) return true;
   const target = diagonalTarget(sim, troop.cell, fd, side, troop.team);
-  if (target) troop.setTarget(target, troop.speed);
+  if (target) troop.setTarget(target, sim.moveSpeed(troop, target));
   return true;
 }
 
@@ -134,7 +134,7 @@ function funnel(troop, sign, fd, radius, sim) {
   if (Math.abs(troop.cell.y - sign.y) > 1) return false;
   const target = diagonalTarget(sim, troop.cell, fd, across > 0 ? -1 : 1, troop.team);
   if (!target) return false;
-  troop.setTarget(target, troop.speed);
+  troop.setTarget(target, sim.moveSpeed(troop, target));
   return true;
 }
 

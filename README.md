@@ -47,7 +47,8 @@ the clock does.
    column wherever the two meet.
   it will automatically pick up — rifles, pickaxes, ladders. Equipping troops
   this way permanently changes what they can do (dig through walls, climb
-   vertical faces, fight at range). Support kits round the toolbox out: a
+   vertical faces, fight at range). A **bridge** kit lays planks over trenches
+   and pits instead of dropping in. Support kits round the toolbox out: a
    **medic** kit heals wounded comrades in range automatically, **grenades**
    are lobbed at anything hostile in a band ahead, **armor** soaks up half of
    every hit until it is spent, and a **parachute** turns a fatal drop into a
@@ -57,7 +58,6 @@ the clock does.
    rule.
 - **Roles.** A handful of troops can be pulled aside and given a special job —
   such as becoming a builder who constructs stairways, changing how the whole
-  group can move through the level.
 - **Guards.** The tower isn't empty. Sentries, turrets, and grenadiers defend
   it, and your column will need to fight, avoid, or route around them.
 - **The objective.** Most levels simply ask you to get a certain number of
@@ -86,6 +86,10 @@ standard progression of twelve levels that ramps up in length and
 difficulty. Press **C** (or open `?campaign=N`) to play it; after a win the
 end card offers the next level (**N**). Any campaign level can be loaded
 into the designer, tweaked and shared like a hand-made one.
+Generators are pluggable: besides the siege corridor there is an open
+**arena** and a **maze** — a labyrinth with trapped dead ends, mud on the
+route and enemy patrols marching up and down its straights on their own
+signs — and `docs/generators.md` explains how to add another.
 For hand-authored or machine-generated levels there is also a **command-line
 level tool** (`node scripts/level-tool.mjs levels/`, Node 18+, no dependencies):
 it validates level JSON strictly against the documented schema, checks that
@@ -139,3 +143,7 @@ no accounts, playable directly in a browser.
 - Developers and hobbyists interested in browser-based 3D games as a genre
   of small, shareable, link-based experiences — no downloads, no installs,
   just a URL.
+  group can move through the level. Right-click a builder to pause it and keep
+  its planks for later; right-click again to resume.
+- **Terrain.** Dirt can be dug, stone cannot, spikes kill, and **mud** slows
+  every troop that wades through it — both yours and the enemy's.

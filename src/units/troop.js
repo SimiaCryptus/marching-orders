@@ -21,6 +21,7 @@ const FALL_SPEED = 7; // voxels per second
 const PARACHUTE_FALL_SPEED = 3; // voxels per second under a canopy
 const DIG_TIME = 0.6; // seconds per soft voxel
 const LADDER_TIME = 0.7; // seconds per ladder segment
+const BRIDGE_TIME = 0.5; // seconds per bridge plank
 const CLIMB_SPEED = 0.8; // fraction of walking speed
 const GRENADE_MUZZLE = 0.8; // height above the feet a troop lobs a grenade from
 
@@ -50,7 +51,8 @@ export class Troop {
     this.maxHp = hp;
     this.hp = hp;
     this.armor = 0;
-    this.speed = rules.troopSpeed;
+    this.speed = team === TEAM.ENEMY ? rules.enemyTroopSpeed : rules.troopSpeed;
+    this.scale = team === TEAM.ENEMY ? rules.enemyTroopScale : 1; // body size (rendering only)
     this.attack = rules.troopAttack;
     this.range = 1;
     this.attackCooldown = 0.8;
@@ -64,6 +66,7 @@ export class Troop {
     this.digUses = 0;
     this.digTimer = 0;
     this.ladders = 0;
+    this.bridges = 0;
     // medic kit
     this.healCharges = 0;
     this.healAmount = 0;
@@ -86,6 +89,7 @@ export class Troop {
     // role
     this.role = null;
     this.roleData = null;
+    this.suspended = null; // { role, data } of a paused role, kept so it can be resumed (see suspendRole)
 
     this.fallDistance = 0;
     this.flash = 0;
@@ -224,6 +228,7 @@ export class Troop {
     const step = nextStep(sim.world, c.x, c.y, c.z, this.dir, {
       canDig: this.canDig && this.digUses > 0,
       ladders: this.ladders,
+      bridges: this.bridges,
     });
     switch (step.action) {
       case 'fall':
@@ -265,13 +270,25 @@ export class Troop {
           }
         }
         break;
+      case 'bridge':
+        this.state = TROOP_STATE.BUILDING;
+        this.digTimer += dt;
+        if (this.digTimer >= BRIDGE_TIME) {
+          this.digTimer = 0;
+          sim.placeVoxel(step.target, VOXEL.PLANK); // a permanent plank at floor level; the column follows
+          if (--this.bridges <= 0) {
+            this.bridges = 0;
+            this.removeKit('bridge'); // bridge kit used up
+          }
+        }
+        break;
       default: // walk / stepUp / stepDown
         if (sim.isBlocked(step.target, this.team) || sim.guardAt(step.target)) {
           this.dir = turnAround(this.dir);
           break;
         }
         this.state = TROOP_STATE.WALKING;
-        this.setTarget(step.target, this.speed);
+        this.setTarget(step.target, sim.moveSpeed(this, step.target)); // slowed on mud
     }
   }
 
@@ -352,11 +369,36 @@ export class Troop {
 
   setRole(role, sim) {
     if (this.role) this.clearRole(sim);
+    this.suspended = null; // a fresh assignment replaces a paused job
     this.role = role;
     this.roleData = {};
     this.state = TROOP_STATE.WORKING;
     role.start(this, sim);
   }
+  /**
+   * Pause the current role: the troop marches on like any other, but the job and its progress
+   * (a builder's remaining planks) are kept so it can be resumed later at no cost.
+   */
+  suspendRole(sim) {
+    if (!this.role) return false;
+    this.suspended = { role: this.role, data: this.roleData };
+    this.role = null;
+    this.roleData = null;
+    if (this.alive && this.state === TROOP_STATE.WORKING) this.state = TROOP_STATE.WALKING;
+    return true;
+  }
+  /** Resume a paused role where the troop stands now (roles may reset per-site progress in `resume`). */
+  resumeRole(sim) {
+    const s = this.suspended;
+    if (!s) return false;
+    this.suspended = null;
+    this.role = s.role;
+    this.roleData = s.data;
+    this.state = TROOP_STATE.WORKING;
+    if (s.role.resume) s.role.resume(this, sim);
+    return true;
+  }
+
 
   clearRole(sim) {
     const role = this.role;

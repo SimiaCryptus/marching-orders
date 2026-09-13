@@ -8,12 +8,14 @@ export const VOXEL = Object.freeze({
   OBJECTIVE: 5,
   SPIKES: 6,
    LADDER: 7,
+  MUD: 8,
 });
 
 /**
  * Gameplay data per voxel type.
  * hardness: 1 = soft (pickaxe), 3 = hard (needs explosives), Infinity = indestructible.
   * climbable: non-solid voxel a unit can stand in and climb through (ladders).
+* slow: walking onto a cell whose floor is this voxel is slowed (rules.mudSpeed).
  */
 export const VOXEL_TYPES = [
   { id: 0, name: 'air',       solid: false, hardness: 0,        color: 0x000000 },
@@ -24,6 +26,7 @@ export const VOXEL_TYPES = [
   { id: 5, name: 'objective', solid: true,  hardness: Infinity, color: 0xb8902a, top: 0xffdd55 },
   { id: 6, name: 'spikes',    solid: true,  hardness: Infinity, color: 0x8c2a2a, lethal: true },
    { id: 7, name: 'ladder',    solid: false, hardness: 1,        color: 0xb98a4e, climbable: true },
+  { id: 8, name: 'mud',       solid: true,  hardness: 1,        color: 0x4e3f26, top: 0x6a5530, slow: true },
 ];
 
 export const VOXEL_BY_NAME = Object.fromEntries(VOXEL_TYPES.map((t) => [t.name, t.id]));
@@ -45,4 +48,8 @@ export function isLethal(id) {
 }
 export function isClimbable(id) {
    return !!voxelInfo(id).climbable;
+}
+/** A floor voxel that slows the step taken onto it (mud). */
+export function isSlow(id) {
+  return !!voxelInfo(id).slow;
 }

@@ -136,6 +136,7 @@ throw. Runs that overflow the array are clipped; a short list leaves the tail as
 | `plank` | ✔ | (soft) | – | – | placed by the Builder role |
 | `ladder` | – | – | ✔ | – | climbable, counts as support |
 | `spikes` | ✔ | – | – | ✔ | kills a troop that arrives in the cell above it |
+| `mud` | ✔ | ✔ | – | – | slow floor: a step onto a mud-floored cell takes `speed × rules.mudSpeed` (default ½) |
 | `objective` | ✔ | – | – | – | vault-floor marker under the objective volume |
 
 The canonical list and the predicates (`isSolid`, `isDiggable`, `isClimbable`, `isLethal`) are
@@ -159,12 +160,15 @@ Everything a troop does when it reaches a cell centre is decided by `nextStep()`
    * else it has a pickaxe and the block ahead is diggable → **dig** (0.6 s per voxel).
    * else → **turn around**.
 4. **Air ahead:** walk if `(tx,y-1,tz)` is solid; **stepDown** if `(tx,y-2,tz)` is solid;
-   otherwise it walks off the ledge and gravity takes over.
+   otherwise, if the troop carries a bridge kit and `(tx,y-1,tz)` is air, it lays a plank there
+   (**bridge**, 0.5 s per plank) and walks on; otherwise it walks off the ledge and gravity takes over.
 5. **Falling.** `fallDistance` counts cells; `fallDistance > lethalFall` kills on landing.
    Landing on a cell whose block below is lethal (spikes) always kills.
 6. **Blocked cells.** A troop will not step into a cell occupied by a hostile guard, nor onto
    a `blocker` sign of its own team — it turns around.
-7. **On arrival**, in this order: hazard check → objective check (player troops only, →
+7. **Mud.** A step onto a cell whose floor voxel is `mud` is taken at `speed × rules.mudSpeed`
+   (both teams). Mud never blocks; it buys turrets and patrols time.
+8. **On arrival**, in this order: hazard check → objective check (player troops only, →
    `SAVED`) → crate pickup → sign effects (skipped while a role is running).
 
 ### Consequences for authoring
@@ -175,7 +179,8 @@ Everything a troop does when it reaches a cell centre is decided by `nextStep()`
   test it) and usually demands a Builder or a pickaxe.
 * A `stone` wall can only be gone *around* or *over* — never through.
 * Trenches: carving `air` from `y=1` to `FLOOR_Y-1` gives a 2-deep pit; troops drop in
-  (survivable at the default `lethalFall`) and face a 2-high wall on the far side.
+  (survivable at the default `lethalFall`) and face a 2-high wall on the far side. A bridge
+  crate lets the column plank straight across instead (one plank per gap cell).
 * Never leave a drop that exceeds `lethalFall` on the only viable route unless you intend it
   as a hazard.
 * The default corridor must eventually reach the objective volume; if the only path is through
@@ -248,6 +253,7 @@ player may place come from `budget.signs`.
 | `rifle` | `range = rules.rifleRange` (8), `attack = rules.rifleAttack` (3), cooldown 1.0 s — ranged troops out-duel sentries and shoot turrets off walls |
 | `pickaxe` | `canDig = true`, `digUses = rules.pickaxeCharges` (10 voxels); consumed, then the slot frees up |
 | `ladder` | `ladders = rules.ladderCharges` (3 segments) for climbing walls ≥ 2 high |
+| `bridge` | `bridges = rules.bridgeCharges` (4 planks): when a gap (a drop of two or more) is ahead the troop lays a permanent plank at floor level and walks on — trenches and pits become crossings |
 | `medic` | `rules.medicCharges` (6) heals of `rules.medicHeal` (4) HP, applied automatically to the nearest wounded troop of its team within `rules.medicRange` (3) cells, every `rules.medicCooldown` (1.5 s) |
 | `grenade` | `rules.grenadeCharges` (3) grenades lobbed at hostiles between `rules.grenadeMinRange` (2) and `rules.grenadeRange` (6) cells with line of sight: `rules.grenadeAttack` (6) damage over `rules.grenadeSplash` (1.5) cells, every `rules.grenadeCooldown` (3 s); they hurt enemy troops *and* guards |
 | `armor` | absorbs `rules.armorMitigation` (50 %) of every hit until `rules.armorPool` (20 — twice a troop's HP) damage has been soaked up, then it is discarded |
@@ -268,6 +274,10 @@ Only `builder` exists. A builder lays a diagonal up-and-forward staircase of pla
 plank, 12 planks max, and stops when the stair meets walkable ground, when it runs out, or when
 something blocks the next plank (then it turns around). Grant `builder: 1–2` whenever the level
 contains walls or trenches; it is the fallback when ladders/pickaxes run dry.
+A right-click (or shift-click) on a builder **pauses** it: it marches on like any other troop
+but keeps its remaining planks, and another right-click (or the Builder tool, at no cost)
+resumes it with a fresh staircase from wherever it stands — so one builder can bridge two
+obstacles if the player rations its 12 planks.
 
 ---
 
@@ -284,6 +294,7 @@ hostiles = #guards + #enemySpawners
 
 crates.pickaxe = max(1, ceil(nWalls / 2))
 crates.ladder  = nWalls > 0 ? 1 : 0
+crates.bridge  = #pit > 0 ? 1 : 0             // plank across the trench instead of dropping in
 crates.rifle   = hostiles > 0 ? 1 + floor(hostiles / 3) : 0
 crates.medic   = hostiles >= 3 ? 1 : 0
 crates.grenade = keepGuards >= 3 ? 1 : 0
@@ -312,9 +323,11 @@ becomes `arrow: 2`).
 Every key (see the table in `src/rules.js` / `level.d.ts`) is optional; missing keys use the
 default, out-of-range values are clamped, integer-stepped keys are rounded, and the
 `<kind>Exclusive` flags are booleans. Besides troop and guard stats the block configures every
-kit: rifle range/damage, pickaxe and ladder charges, the medic's charges/heal/range/cooldown,
+kit: rifle range/damage, pickaxe, ladder and bridge charges, the medic's charges/heal/range/cooldown,
 the grenade band/damage/splash/cooldown, armor pool and mitigation, parachute charges, and
-which kits are exclusive. Use `rules` to change *difficulty* without changing *terrain*:
+which kits are exclusive. Enemy columns have their own `enemyTroopHp`, `enemyTroopSpeed` and
+`enemyTroopScale` (body size), and `mudSpeed` sets how much mud slows a step. Use `rules` to
+change *difficulty* without changing *terrain*:
 bumping `enemyTroopHp` and `guardHpScale` with difficulty is exactly what the parametric
 builder does (`enemyTroopHp = 10 + difficulty`, `guardHpScale = 1 + 0.05 * difficulty`).
 
@@ -330,6 +343,7 @@ segment origin `x`.
 | **Dirt wall** (2 thick, 2 high) | `{dirt, [x,3,0], [x+1,4,d-1]}` | dig / ladder / build |
 | **Tall wall** (3 high) | `{dirt, [x,3,0], [x+1,5,d-1]}` | one ladder kit is not enough |
 | **Trench** (2 deep) | `{air, [x,1,0], [x+1,2,d-1]}` | falling is fine, climbing out is not |
+| **Mud flat** | `{mud, [x+1,2,0], [x+4,2,d-1]}` | the column crawls: time patrols and turret fire |
 | **Spike field** | `{spikes, [x,2,0], [x,2,d-1]}` then `{dirt, [x,2,gz], [x,2,gz+gapW-1]}` | steering: the safe gap is *never* on the pod's lane |
 | **Turret pillar** | `{stone, [x,3,pz], [x,6,pz]}` + guard `turret @ [x,7,pz]` | rifles or a detour |
 | **Keep** | 4 stone walls `y=3..9` + an `air` gate 2 wide/2 high + parapet corners | funnels the column into a killzone |
@@ -515,6 +529,10 @@ const level = buildParametricLevel({ seed: 42, difficulty: 5, segments: 7, depth
   re-tweak them. Keep that field when you post-process a generated level.
 * `buildCampaignLevel(i)` / `campaignParams(i)` produce the fixed 12-level progression and tag
   the level with `campaign: { index, length }` so the game can offer the next one after a win.
+* Other registered generators (`listGenerators()`): `arena` (open yard) and `maze` (a perfect
+  maze with trapped dead ends, mud on the route and enemy patrols programmed into straight
+  stretches with enemy arrow signs). `buildLevel('maze', { seed, cells, corridor, difficulty, mud })`
+  — see [`generators.md`](generators.md).
 
 When you write a *new* generator, mirror these invariants:
 

@@ -6,20 +6,25 @@
  * Numeric rules carry min / max / step; `type: 'boolean'` rules are plain flags. `group` is the
  * heading the designer files the rule under (rules without one go into the general block).
  */
-const KITS = 'Rifle, pickaxe & ladder';
+const KITS = 'Rifle, pickaxe, ladder & bridge';
 const EXCLUSIVE = 'Exclusive kits (take the one equipment slot)';
 
 export const RULE_DEFS = Object.freeze([
   { key: 'troopHp', label: 'Player troop HP', min: 1, max: 999, step: 1, def: 10 },
   { key: 'enemyTroopHp', label: 'Enemy troop HP', min: 1, max: 999, step: 1, def: 10 },
   { key: 'troopSpeed', label: 'Troop speed (cells/s)', min: 0.5, max: 10, step: 0.1, def: 2.5 },
+  { key: 'enemyTroopSpeed', label: 'Enemy troop speed (cells/s)', min: 0.5, max: 10, step: 0.1, def: 2.5 },
+  { key: 'enemyTroopScale', label: 'Enemy troop size ×', min: 0.5, max: 2.5, step: 0.1, def: 1 },
   { key: 'troopAttack', label: 'Troop melee damage', min: 0, max: 99, step: 1, def: 2 },
   { key: 'crateCapacity', label: 'Troops served per crate', min: 1, max: 99, step: 1, def: 5 },
+  // Mud voxels slow every step taken onto them (troops of both teams).
+  { key: 'mudSpeed', label: 'Speed on mud ×', min: 0.1, max: 1, step: 0.05, def: 0.5 },
   // Rifle, pickaxe and ladder kits
   { key: 'rifleRange', label: 'Rifle range (cells)', min: 2, max: 32, step: 1, def: 8, group: KITS },
   { key: 'rifleAttack', label: 'Rifle damage', min: 0, max: 99, step: 1, def: 3, group: KITS },
   { key: 'pickaxeCharges', label: 'Pickaxe charges', min: 1, max: 999, step: 1, def: 10, group: KITS },
   { key: 'ladderCharges', label: 'Ladder segments per kit', min: 1, max: 99, step: 1, def: 3, group: KITS },
+  { key: 'bridgeCharges', label: 'Bridge planks per kit', min: 1, max: 99, step: 1, def: 4, group: KITS },
   // Medic kit: heals the nearest wounded troop of its team within range, one charge per heal
   { key: 'medicCharges', label: 'Medic heal charges', min: 1, max: 99, step: 1, def: 6, group: 'Medic' },
   { key: 'medicHeal', label: 'HP healed per charge', min: 1, max: 99, step: 1, def: 4, group: 'Medic' },
@@ -44,6 +49,7 @@ export const RULE_DEFS = Object.freeze([
   { key: 'rifleExclusive', label: 'Rifle', type: 'boolean', def: true, group: EXCLUSIVE },
   { key: 'pickaxeExclusive', label: 'Pickaxe', type: 'boolean', def: true, group: EXCLUSIVE },
   { key: 'ladderExclusive', label: 'Ladder kit', type: 'boolean', def: true, group: EXCLUSIVE },
+  { key: 'bridgeExclusive', label: 'Bridge kit', type: 'boolean', def: true, group: EXCLUSIVE },
   { key: 'medicExclusive', label: 'Medic kit', type: 'boolean', def: true, group: EXCLUSIVE },
   { key: 'grenadeExclusive', label: 'Grenades', type: 'boolean', def: true, group: EXCLUSIVE },
   { key: 'armorExclusive', label: 'Armor', type: 'boolean', def: false, group: EXCLUSIVE },

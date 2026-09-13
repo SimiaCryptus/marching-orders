@@ -84,6 +84,7 @@ class UnitBatch {
       const f = DIRS[u.dir];
       this.dummy.position.set(u.pos.x, u.pos.y, u.pos.z);
       this.dummy.rotation.set(0, Math.atan2(f.dx, f.dz), 0);
+      this.dummy.scale.setScalar(u.scale ?? 1); // enemy troops may be bigger / smaller (rules.enemyTroopScale)
       this.dummy.updateMatrix();
       this.mesh.setMatrixAt(i, this.dummy.matrix);
       colorFn(u, this.color);
@@ -421,7 +422,13 @@ export class Renderer {
         color.setHex(TEAM_COLORS.enemy);
          if (kit) color.lerp(this.tmpColor.setHex(EQUIPMENT[kit].color), 0.45);
       } else {
-         color.setHex(t.role ? t.role.color : kit ? EQUIPMENT[kit].color : TEAM_COLORS.player);
+        if (t.role) {
+          color.setHex(t.role.color);
+        } else {
+          color.setHex(kit ? EQUIPMENT[kit].color : TEAM_COLORS.player);
+          // A paused job (builder on hold) shows as a half-tint of the role colour.
+          if (t.suspended) color.lerp(this.tmpColor.setHex(t.suspended.role.color), 0.5);
+        }
       }
       if (t.flash > 0) color.lerp(WHITE, t.flash * 0.8);
     });

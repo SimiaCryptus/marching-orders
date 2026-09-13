@@ -8,6 +8,8 @@ const BRICKS = 12;
  * Builds a diagonal staircase forward and upward, one plank at a time, then steps onto it.
  * Stops when it runs out of planks, when the stair meets existing terrain (walks on), or
  * when something blocks the next plank (turns around, Lemmings-style).
+* A builder can be paused (right-click): it keeps its remaining planks and, once resumed,
+* starts a fresh staircase from wherever it stands.
  */
 export const BuilderRole = Object.freeze({
   name: 'builder',
@@ -17,9 +19,21 @@ export const BuilderRole = Object.freeze({
   start(troop) {
     troop.roleData = { bricks: BRICKS, placed: 0, timer: 0 };
   },
+  /** Resumed after a pause: same planks, new staircase. */
+  resume(troop) {
+    const d = troop.roleData || { bricks: BRICKS };
+    troop.roleData = { bricks: d.bricks, placed: 0, timer: 0 };
+  },
+  /** Human-readable progress for hints ("7 planks left"). */
+  progress(data) {
+    const n = data ? data.bricks : BRICKS;
+    return `${n} plank${n === 1 ? '' : 's'} left`;
+  },
+
 
   update(troop, dt, sim) {
     const d = troop.roleData;
+    if (d.bricks <= 0) { troop.clearRole(sim); return true; } // resumed with nothing left to build
     const { dx, dz } = troop.facing;
     const c = troop.cell;
     const world = sim.world;

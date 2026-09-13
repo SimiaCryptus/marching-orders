@@ -7,7 +7,7 @@
   "spawn": { "pos": [2, 3, 6], "dir": [1, 0], "count": 25, "rate": 1.5 },
   "objective": { "type": "reach", "from": [30, 3, 4], "to": [32, 3, 7], "required": 8 },
   "budget": {
-     "crates": { "rifle": 1, "pickaxe": 1, "ladder": 1, "medic": 1, "grenade": 1, "armor": 1, "parachute": 1 },
+     "crates": { "rifle": 1, "pickaxe": 1, "ladder": 1, "bridge": 1, "medic": 1, "grenade": 1, "armor": 1, "parachute": 1 },
      "signs": { "blocker": 3, "arrow": 2, "fan": 1, "forward": 1 },
     "roles": { "builder": 2 }
   },
