@@ -13,6 +13,13 @@ const HUD_CSS = `
 #hud-palette .tool-popout { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6;
   display: none; flex-direction: column; gap: 2px; min-width: 220px; padding: 6px; }
 #hud-palette .tool-popout.open { display: flex; }
+/* The hint is a one-liner by default; long text is clipped and expands on hover/focus. */
+#hud-hint { max-width: min(52ch, calc(100vw - 24px)); white-space: nowrap; overflow: hidden;
+   text-overflow: ellipsis; transition: max-width 120ms ease; }
+#hud-hint.clipped { cursor: help; }
+#hud-hint.clipped:hover, #hud-hint.clipped:focus-visible {
+   max-width: min(80ch, calc(100vw - 24px)); white-space: normal; overflow: visible;
+   text-overflow: clip; outline: none; }
 #hud-menu { position: fixed; inset: 0; z-index: 30; pointer-events: auto; display: flex;
   align-items: center; justify-content: center; background: rgba(8, 10, 16, 0.55); }
 #hud-menu.hidden { display: none; }
@@ -108,6 +115,7 @@ export class Hud {
 
     // Hint / toast
     this.hint = el('div', 'panel', 'hud-hint');
+     this.hint.tabIndex = 0; // so the clipped text can also be expanded from the keyboard
     root.append(this.hint);
     this.toast = el('div', 'panel hidden', 'hud-toast');
     root.append(this.toast);
@@ -224,7 +232,13 @@ export class Hud {
   // ---- state ---------------------------------------------------------------------
 
   setHint(text) {
-    if (this.hint.textContent !== text) this.hint.textContent = text;
+     if (this.hint.textContent === text) return;
+     this.hint.textContent = text;
+     // Only advertise the expand affordance when the text actually got cut off.
+     const clipped = this.hint.scrollWidth > this.hint.clientWidth + 1;
+     this.hint.classList.toggle('clipped', clipped);
+     if (clipped) this.hint.title = text;
+     else this.hint.removeAttribute('title');
   }
 
   setPaused(paused) {
