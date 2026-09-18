@@ -68,7 +68,7 @@ export class Hud {
     this.handlers = handlers;
     this.tools = handlers.tools;
     this.entries = new Map(); // tool id -> { btn, count, tool, group } (popout row)
-    this.groups = [];         // one slot per tool kind
+    this.groups = []; // one slot per tool kind
     this.selected = null;
     root.innerHTML = '';
 
@@ -115,7 +115,7 @@ export class Hud {
 
     // Hint / toast
     this.hint = el('div', 'panel', 'hud-hint');
-     this.hint.tabIndex = 0; // so the clipped text can also be expanded from the keyboard
+    this.hint.tabIndex = 0; // so the clipped text can also be expanded from the keyboard
     root.append(this.hint);
     this.toast = el('div', 'panel hidden', 'hud-toast');
     root.append(this.toast);
@@ -132,13 +132,24 @@ export class Hud {
     const close = () => handlers.onToggleMenu?.(false);
     menuRow.append(
       button('Resume [M]', close, 'btn primary'),
-      button('Restart [R]', () => { close(); handlers.onRestart(); }),
-      button('Campaign [C]', () => { close(); handlers.onStartCampaign(); }),
-      button('Level designer [E]', () => { close(); handlers.onOpenEditor(); }),
+      button('Restart [R]', () => {
+        close();
+        handlers.onRestart();
+      }),
+      button('Campaign [C]', () => {
+        close();
+        handlers.onStartCampaign();
+      }),
+      button('Level designer [E]', () => {
+        close();
+        handlers.onOpenEditor();
+      })
     );
     menuCard.append(menuTitle, menuText, menuRow);
     this.menu.append(menuCard);
-    this.menu.addEventListener('click', (e) => { if (e.target === this.menu) close(); });
+    this.menu.addEventListener('click', (e) => {
+      if (e.target === this.menu) close();
+    });
     root.append(this.menu);
 
     // End overlay
@@ -232,13 +243,13 @@ export class Hud {
   // ---- state ---------------------------------------------------------------------
 
   setHint(text) {
-     if (this.hint.textContent === text) return;
-     this.hint.textContent = text;
-     // Only advertise the expand affordance when the text actually got cut off.
-     const clipped = this.hint.scrollWidth > this.hint.clientWidth + 1;
-     this.hint.classList.toggle('clipped', clipped);
-     if (clipped) this.hint.title = text;
-     else this.hint.removeAttribute('title');
+    if (this.hint.textContent === text) return;
+    this.hint.textContent = text;
+    // Only advertise the expand affordance when the text actually got cut off.
+    const clipped = this.hint.scrollWidth > this.hint.clientWidth + 1;
+    this.hint.classList.toggle('clipped', clipped);
+    if (clipped) this.hint.title = text;
+    else this.hint.removeAttribute('title');
   }
 
   setPaused(paused) {
@@ -281,9 +292,10 @@ export class Hud {
     this.stats.enemies.textContent = String(sim.troops.length - marching + sim.guards.length);
     this.stats.saved.textContent = `${sim.saved} / ${sim.objective.required}`;
     this.stats.lost.textContent = String(sim.lost);
-    this.stats.time.textContent = sim.timeLimit > 0
-      ? `${formatTime(sim.time)} / ${formatTime(sim.timeLimit)}`
-      : formatTime(sim.time);
+    this.stats.time.textContent =
+      sim.timeLimit > 0
+        ? `${formatTime(sim.time)} / ${formatTime(sim.timeLimit)}`
+        : formatTime(sim.time);
 
     const counts = new Map();
     for (const tool of this.tools) {
@@ -310,8 +322,7 @@ export class Hud {
     const won = status === 'won';
     this.closePopouts();
     this.overlayTitle.textContent = won ? 'Objective Secured' : 'Assault Failed';
-    this.overlayText.textContent =
-      `${won ? '' : `${sim.loseReason}. `}Saved ${sim.saved}/${sim.objective.required} · Lost ${sim.lost} · Time ${formatTime(sim.time)}`;
+    this.overlayText.textContent = `${won ? '' : `${sim.loseReason}. `}Saved ${sim.saved}/${sim.objective.required} · Lost ${sim.lost} · Time ${formatTime(sim.time)}`;
     this.nextBtn.classList.toggle('hidden', !(won && hasNext));
     this.overlay.classList.remove('hidden');
   }

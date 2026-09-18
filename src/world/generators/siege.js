@@ -8,7 +8,7 @@ import { mulberry32, plural } from './util.js';
  *
  * Every segment is one obstacle picked from a difficulty-gated catalogue (dirt walls to dig or
  * ladder over, trenches to fall into and climb out of, spike fields the column must be steered
-* around, mud flats that slow it, turret pillars). Enemy drop pods are spread along the approach so their columns cross
+ * around, mud flats that slow it, turret pillars). Enemy drop pods are spread along the approach so their columns cross
  * the player's path, the keep is garrisoned from a fixed roster of posts, and the player's budget
  * is derived from the obstacles and hostiles actually placed, so a generated level is always
  * solvable with the tools it hands out.
@@ -29,10 +29,40 @@ import { mulberry32, plural } from './util.js';
 /** Parameter schema (generator.d.ts). Order = display order in the designer. */
 export const PARAMS = Object.freeze([
   { key: 'seed', label: 'Seed', type: 'int', min: 0, max: 999999, default: 1, layout: true },
-  { key: 'difficulty', label: 'Difficulty (0–10)', type: 'int', min: 0, max: 10, default: 3, layout: true },
-  { key: 'segments', label: 'Obstacle segments', type: 'int', min: 1, max: 20, default: 6, layout: true },
-  { key: 'depth', label: 'Corridor width', type: 'int', min: 10, max: 40, default: 16, layout: true },
-  { key: 'name', label: 'Name', type: 'string', default: '', help: 'Blank: "Siege #<seed> (difficulty n)"' },
+  {
+    key: 'difficulty',
+    label: 'Difficulty (0–10)',
+    type: 'int',
+    min: 0,
+    max: 10,
+    default: 3,
+    layout: true,
+  },
+  {
+    key: 'segments',
+    label: 'Obstacle segments',
+    type: 'int',
+    min: 1,
+    max: 20,
+    default: 6,
+    layout: true,
+  },
+  {
+    key: 'depth',
+    label: 'Corridor width',
+    type: 'int',
+    min: 10,
+    max: 40,
+    default: 16,
+    layout: true,
+  },
+  {
+    key: 'name',
+    label: 'Name',
+    type: 'string',
+    default: '',
+    help: 'Blank: "Siege #<seed> (difficulty n)"',
+  },
   { key: 'troops', label: 'Player troops', type: 'int', min: 5, max: 300, auto: true },
   { key: 'patrols', label: 'Enemy pods', type: 'int', min: 0, max: 40, auto: true },
   { key: 'enemyTroops', label: 'Troops per enemy pod', type: 'int', min: 1, max: 60, auto: true },
@@ -41,26 +71,32 @@ export const PARAMS = Object.freeze([
 ]);
 
 // Derived views of the schema, kept for code that used the pre-framework constants.
-export const GENERATOR_LIMITS = Object.freeze(Object.fromEntries(
-  PARAMS.filter((p) => p.type === 'int').map((p) => [p.key, Object.freeze({ min: p.min, max: p.max })]),
-));
+export const GENERATOR_LIMITS = Object.freeze(
+  Object.fromEntries(
+    PARAMS.filter((p) => p.type === 'int').map((p) => [
+      p.key,
+      Object.freeze({ min: p.min, max: p.max }),
+    ])
+  )
+);
 export const AUTO_PARAMS = Object.freeze(PARAMS.filter((p) => p.auto).map((p) => p.key));
-export const GENERATOR_DEFAULTS = Object.freeze(Object.fromEntries(
-  PARAMS.filter((p) => !p.auto).map((p) => [p.key, p.default]),
-));
+export const GENERATOR_DEFAULTS = Object.freeze(
+  Object.fromEntries(PARAMS.filter((p) => !p.auto).map((p) => [p.key, p.default]))
+);
 
-const SEGMENT_SPAN = 8;    // x cells per obstacle segment (obstacle + run-up)
-const RUNWAY = 12;         // open ground between the pod and the first obstacle
-const KEEP_SPAN = 15;      // outer width of the keep along x
-const MARGIN = 4;          // ground behind the keep
+const SEGMENT_SPAN = 8; // x cells per obstacle segment (obstacle + run-up)
+const RUNWAY = 12; // open ground between the pod and the first obstacle
+const KEEP_SPAN = 15; // outer width of the keep along x
+const MARGIN = 4; // ground behind the keep
 const HEIGHT = 16;
-const FLOOR_Y = 3;         // the air cell troops walk in (bedrock at 0, dirt at 1..2)
-const WALL_TOP = 9;        // top voxel of the keep walls
+const FLOOR_Y = 3; // the air cell troops walk in (bedrock at 0, dirt at 1..2)
+const WALL_TOP = 9; // top voxel of the keep walls
 const POD_OFFSETS = [2, 6]; // x offsets inside a segment where an enemy pod may sit
 
 /** Values used for the count parameters left on auto, derived from difficulty and length. */
 export function autoParams(p) {
-  const d = p.difficulty, n = p.segments;
+  const d = p.difficulty,
+    n = p.segments;
   const patrols = d >= 4 ? Math.min(2 * n, 1 + Math.floor((d - 4) / 2) + Math.floor(n / 6)) : 0;
   return {
     troops: 24 + 3 * n,
@@ -88,7 +124,9 @@ function pickSegments(rng, difficulty, n) {
   const used = {};
   const out = [];
   for (let i = 0; i < n; i++) {
-    const pool = SEGMENT_KINDS.filter((k) => difficulty >= k.minDifficulty && (used[k.kind] ?? 0) < (k.max ?? Infinity));
+    const pool = SEGMENT_KINDS.filter(
+      (k) => difficulty >= k.minDifficulty && (used[k.kind] ?? 0) < (k.max ?? Infinity)
+    );
     const prev = out[out.length - 1];
     const choices = pool.length > 1 ? pool.filter((k) => k.kind !== prev) : pool; // avoid back-to-back repeats
     let total = 0;
@@ -97,7 +135,10 @@ function pickSegments(rng, difficulty, n) {
     let chosen = choices[choices.length - 1];
     for (const k of choices) {
       r -= k.weight;
-      if (r < 0) { chosen = k; break; }
+      if (r < 0) {
+        chosen = k;
+        break;
+      }
     }
     used[chosen.kind] = (used[chosen.kind] ?? 0) + 1;
     out.push(chosen.kind);
@@ -112,7 +153,8 @@ export function build(p) {
   // Only the layout parameters seed the RNG: tweaking a count never reshuffles the terrain.
   const rng = mulberry32(p.seed * 1000003 + p.difficulty * 1009 + p.segments * 101 + p.depth);
 
-  const d = p.depth, h = HEIGHT;
+  const d = p.depth,
+    h = HEIGHT;
   const mid = Math.floor(d / 2);
   const keepX = RUNWAY + p.segments * SEGMENT_SPAN;
   const w = keepX + KEEP_SPAN + MARGIN;
@@ -121,7 +163,10 @@ export function build(p) {
     { type: 'bedrock', from: [0, 0, 0], to: [w - 1, 0, d - 1] },
     { type: 'dirt', from: [0, 1, 0], to: [w - 1, FLOOR_Y - 1, d - 1] },
   ];
-  const guards = [], enemySpawners = [], crates = [], signs = [];
+  const guards = [],
+    enemySpawners = [],
+    crates = [],
+    signs = [];
   const counts = { wall: 0, tallWall: 0, spikes: 0, pit: 0, mud: 0, pillar: 0 };
 
   // ---- obstacle segments ----------------------------------------------------------------
@@ -140,9 +185,14 @@ export function build(p) {
         // A spike row replacing the top soil, with a safe gap that is never on the pod's lane.
         const gapW = p.difficulty >= 8 ? 1 : 2;
         let gz;
-        do gz = 1 + Math.floor(rng() * (d - 1 - gapW)); while (gz <= mid && mid <= gz + gapW - 1);
+        do gz = 1 + Math.floor(rng() * (d - 1 - gapW));
+        while (gz <= mid && mid <= gz + gapW - 1);
         fills.push({ type: 'spikes', from: [x, FLOOR_Y - 1, 0], to: [x, FLOOR_Y - 1, d - 1] });
-        fills.push({ type: 'dirt', from: [x, FLOOR_Y - 1, gz], to: [x, FLOOR_Y - 1, gz + gapW - 1] });
+        fills.push({
+          type: 'dirt',
+          from: [x, FLOOR_Y - 1, gz],
+          to: [x, FLOOR_Y - 1, gz + gapW - 1],
+        });
         break;
       }
       case 'pit': // a two-deep trench: troops drop in and face a two-high wall on the far side
@@ -168,33 +218,52 @@ export function build(p) {
   // Pods sit on one side of the yard between the obstacles (never on an obstacle column) and
   // march their columns straight across the player's path; the first ones may get a rifle crate.
   const slots = [];
-  for (let i = 0; i < p.segments; i++) for (const off of POD_OFFSETS) slots.push(RUNWAY + i * SEGMENT_SPAN + off);
+  for (let i = 0; i < p.segments; i++)
+    for (const off of POD_OFFSETS) slots.push(RUNWAY + i * SEGMENT_SPAN + off);
   const nPatrols = Math.min(p.patrols, slots.length);
   const flip = rng() < 0.5 ? 1 : 0;
   for (let k = 0; k < nPatrols; k++) {
     const x = slots[Math.floor(((k + 0.5) * slots.length) / nPatrols)];
     const side = (k + flip) % 2 === 0 ? 0 : d - 1;
-    enemySpawners.push({ pos: [x, FLOOR_Y, side], dir: [0, side === 0 ? 1 : -1], count: p.enemyTroops, rate: 6 });
+    enemySpawners.push({
+      pos: [x, FLOOR_Y, side],
+      dir: [0, side === 0 ? 1 : -1],
+      count: p.enemyTroops,
+      rate: 6,
+    });
     if (k < p.enemyCrates) {
-      crates.push({ kind: 'rifle', pos: [x, FLOOR_Y, side === 0 ? 1 : d - 2], team: 'enemy', capacity: 3 });
+      crates.push({
+        kind: 'rifle',
+        pos: [x, FLOOR_Y, side === 0 ? 1 : d - 2],
+        team: 'enemy',
+        capacity: 3,
+      });
     }
   }
 
   // ---- the keep -------------------------------------------------------------------------
-  const kz0 = Math.max(1, mid - 5), kz1 = Math.min(d - 2, mid + 4);
+  const kz0 = Math.max(1, mid - 5),
+    kz1 = Math.min(d - 2, mid + 4);
   const kx1 = keepX + KEEP_SPAN - 1;
   fills.push(
     { type: 'stone', from: [keepX, FLOOR_Y, kz0], to: [kx1, WALL_TOP, kz0] },
     { type: 'stone', from: [keepX, FLOOR_Y, kz1], to: [kx1, WALL_TOP, kz1] },
     { type: 'stone', from: [keepX, FLOOR_Y, kz0], to: [keepX, WALL_TOP, kz1] },
     { type: 'stone', from: [kx1, FLOOR_Y, kz0], to: [kx1, WALL_TOP, kz1] },
-    { type: 'air', from: [keepX, FLOOR_Y, mid - 1], to: [keepX, FLOOR_Y + 1, mid] }, // the gate
+    { type: 'air', from: [keepX, FLOOR_Y, mid - 1], to: [keepX, FLOOR_Y + 1, mid] } // the gate
   );
-  for (const [cx, cz] of [[keepX, kz0], [kx1, kz0], [keepX, kz1], [kx1, kz1]]) {
+  for (const [cx, cz] of [
+    [keepX, kz0],
+    [kx1, kz0],
+    [keepX, kz1],
+    [kx1, kz1],
+  ]) {
     fills.push({ type: 'stone', from: [cx, WALL_TOP + 1, cz], to: [cx, WALL_TOP + 2, cz] }); // parapet corners
   }
-  const oz0 = Math.max(kz0 + 1, mid - 2), oz1 = Math.min(kz1 - 1, mid + 1);
-  const ox0 = keepX + 8, ox1 = keepX + 10;
+  const oz0 = Math.max(kz0 + 1, mid - 2),
+    oz1 = Math.min(kz1 - 1, mid + 1);
+  const ox0 = keepX + 8,
+    ox1 = keepX + 10;
   fills.push({ type: 'objective', from: [ox0, FLOOR_Y - 1, oz0], to: [ox1, FLOOR_Y - 1, oz1] });
 
   // Garrison roster: posts are filled in order, so a small garrison is sentries at the gate and
@@ -214,7 +283,8 @@ export function build(p) {
     { type: 'sentry', pos: [keepX + 1, FLOOR_Y, mid - 3] },
   ];
   const keepGuards = Math.min(p.guards, posts.length);
-  for (let i = 0; i < keepGuards; i++) guards.push({ ...posts[i], pos: [...posts[i].pos], dir: [-1, 0] });
+  for (let i = 0; i < keepGuards; i++)
+    guards.push({ ...posts[i], pos: [...posts[i].pos], dir: [-1, 0] });
 
   // ---- troops, budget, rules ------------------------------------------------------------
   const nWalls = counts.wall + counts.tallWall + counts.pit;
@@ -224,11 +294,11 @@ export function build(p) {
     crates: {
       pickaxe: Math.max(1, Math.ceil(nWalls / 2)),
       ladder: nWalls > 0 ? 1 : 0,
-      bridge: counts.pit > 0 ? 1 : 0,        // planks across the trench instead of dropping in
+      bridge: counts.pit > 0 ? 1 : 0, // planks across the trench instead of dropping in
       rifle: hostiles > 0 ? 1 + Math.floor(hostiles / 3) : 0,
-       medic: hostiles >= 3 ? 1 : 0,          // a garrison worth patching the column up for
-       grenade: keepGuards >= 3 ? 1 : 0,      // bunched defenders inside the keep
-       armor: p.difficulty >= 5 ? 1 : 0,      // turret pillars and crossfire from here on
+      medic: hostiles >= 3 ? 1 : 0, // a garrison worth patching the column up for
+      grenade: keepGuards >= 3 ? 1 : 0, // bunched defenders inside the keep
+      armor: p.difficulty >= 5 ? 1 : 0, // turret pillars and crossfire from here on
     },
     signs: {
       blocker: 2 + enemySpawners.length,
@@ -245,8 +315,10 @@ export function build(p) {
   const parts = [];
   for (const k of SEGMENT_KINDS) if (counts[k.kind]) parts.push(plural(counts[k.kind], k.label));
   if (enemySpawners.length) {
-    parts.push(`${plural(enemySpawners.length, 'enemy patrol')} of ${p.enemyTroops}` +
-      (crates.length ? ` (with ${plural(crates.length, 'rifle crate')})` : ''));
+    parts.push(
+      `${plural(enemySpawners.length, 'enemy patrol')} of ${p.enemyTroops}` +
+        (crates.length ? ` (with ${plural(crates.length, 'rifle crate')})` : '')
+    );
   }
   const description =
     `Get ${required} of ${p.troops} troops into the vault. On the way: ${parts.join(', ') || 'an open yard'}. ` +

@@ -9,10 +9,10 @@ import { ROLES } from '../units/roles/index.js';
  * A troop has one *exclusive* equipment slot plus any number of stackable kits. Whether a kind
  * takes the slot is the level rule `<kind>Exclusive` (armor and parachute stack by default) or
  * the crate's own `exclusive` flag; see `isExclusive`. Consumable kits (pickaxe, ladder, medic,
-* bridge, grenades, armor, parachute) are dropped once used up, which frees the slot again. Whatever a
+ * bridge, grenades, armor, parachute) are dropped once used up, which frees the slot again. Whatever a
  * troop picks up it keeps: effects of several kits combine. How many troops a crate serves is
-* `rules.crateCapacity` unless the kit declares its own `capacity` (the Builder Crate serves one)
-* or the crate says otherwise.
+ * `rules.crateCapacity` unless the kit declares its own `capacity` (the Builder Crate serves one)
+ * or the crate says otherwise.
  */
 export const EQUIPMENT = Object.freeze({
   rifle: {

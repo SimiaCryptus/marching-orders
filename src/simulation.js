@@ -17,7 +17,9 @@ const center = (c) => ({ x: c.x + 0.5, y: c.y + 0.5, z: c.z + 0.5 });
 function makeSpawner(sp, team) {
   return {
     team,
-    x: sp.pos[0], y: sp.pos[1], z: sp.pos[2],
+    x: sp.pos[0],
+    y: sp.pos[1],
+    z: sp.pos[2],
     dir: dirIndexFromVector(sp.dir[0], sp.dir[1]),
     rate: sp.rate ?? 1.5,
     pool: sp.count,
@@ -54,7 +56,7 @@ export class Simulation {
     this.lost = 0;
     this.lethalFall = level.lethalFall ?? 4;
     this.timeLimit = level.timeLimit ?? 0;
-     this.rules = level.rules || DEFAULT_RULES; // tunable stats (rules.js)
+    this.rules = level.rules || DEFAULT_RULES; // tunable stats (rules.js)
 
     this.budget = {
       crates: { ...(level.budget?.crates || {}) },
@@ -64,7 +66,9 @@ export class Simulation {
 
     for (const g of level.guards || []) {
       const dir = g.dir ? dirIndexFromVector(g.dir[0], g.dir[1]) : 2;
-       this.guards.push(new Guard(this.nextId++, g.type, g.pos[0], g.pos[1], g.pos[2], dir, this.rules));
+      this.guards.push(
+        new Guard(this.nextId++, g.type, g.pos[0], g.pos[1], g.pos[2], dir, this.rules)
+      );
     }
     // Level-authored signs and crates (either team). Player ones behave exactly like placed ones.
     for (const s of level.signs || []) {
@@ -75,10 +79,18 @@ export class Simulation {
     for (const c of level.crates || []) {
       const def = EQUIPMENT[c.kind];
       if (!def) continue;
-       this.crates.push(new Crate(
-         this.nextId++, c.kind, c.pos[0], c.pos[1], c.pos[2],
-         c.capacity ?? def.capacity ?? this.rules.crateCapacity, c.team, c.exclusive ?? null,
-       ));
+      this.crates.push(
+        new Crate(
+          this.nextId++,
+          c.kind,
+          c.pos[0],
+          c.pos[1],
+          c.pos[2],
+          c.capacity ?? def.capacity ?? this.rules.crateCapacity,
+          c.team,
+          c.exclusive ?? null
+        )
+      );
     }
   }
 
@@ -120,7 +132,7 @@ export class Simulation {
   }
 
   spawnTroop(sp) {
-     const troop = new Troop(this.nextId++, sp.x, sp.y, sp.z, sp.dir, sp.team, this.rules);
+    const troop = new Troop(this.nextId++, sp.x, sp.y, sp.z, sp.dir, sp.team, this.rules);
     this.troops.push(troop);
     sp.pool--;
     this.events.push({ type: 'spawn', pos: { ...troop.pos }, team: sp.team });
@@ -174,58 +186,68 @@ export class Simulation {
     return troop.speed * (isSlow(below) ? this.rules.mudSpeed : 1);
   }
 
-
   /**
    * Nearest hostile unit a troop can hit: adjacent for melee; anything within range and line of
    * sight for ranged troops (so riflemen return fire on turrets shooting at them from any side).
    * Player troops fight guards and enemy troops; enemy troops fight player troops.
-    * `range` / `minRange` default to the troop's weapon; grenades pass their own band.
+   * `range` / `minRange` default to the troop's weapon; grenades pass their own band.
    */
-   findHostileInRange(troop, range = troop.range, minRange = 0) {
+  findHostileInRange(troop, range = troop.range, minRange = 0) {
     const c = troop.cell;
     let best = null;
     let bestDist = Infinity;
     const consider = (u) => {
-      const dx = u.cell.x - c.x, dy = u.cell.y - c.y, dz = u.cell.z - c.z;
+      const dx = u.cell.x - c.x,
+        dy = u.cell.y - c.y,
+        dz = u.cell.z - c.z;
       const manhattan = Math.abs(dx) + Math.abs(dz);
       let dist;
       if (manhattan <= 1 && Math.abs(dy) <= 1) {
         dist = manhattan;
-       } else if (range > 1) {
+      } else if (range > 1) {
         dist = Math.hypot(dx, dy, dz);
-         if (dist > range || dist >= bestDist) return;
+        if (dist > range || dist >= bestDist) return;
         if (!this.hasLOS(c, u.cell)) return;
       } else {
         return;
       }
-       if (dist < minRange) return;
-      if (dist < bestDist) { bestDist = dist; best = u; }
+      if (dist < minRange) return;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = u;
+      }
     };
     if (troop.team === TEAM.PLAYER) for (const g of this.guards) if (g.alive) consider(g);
     for (const t of this.troops) if (t.alive && t.team !== troop.team) consider(t);
     return best;
   }
-   /** Nearest troop of the medic's team (itself included) within `range` cells that is below full health. */
-   findWoundedNear(medic, range) {
-     let best = null;
-     let bestDist = Infinity;
-     for (const t of this.troops) {
-       if (!t.alive || t.team !== medic.team || t.hp >= t.maxHp) continue;
-       const dist = Math.hypot(t.cell.x - medic.cell.x, t.cell.y - medic.cell.y, t.cell.z - medic.cell.z);
-       if (dist > range || dist >= bestDist) continue;
-       best = t;
-       bestDist = dist;
-     }
-     return best;
-   }
-
+  /** Nearest troop of the medic's team (itself included) within `range` cells that is below full health. */
+  findWoundedNear(medic, range) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const t of this.troops) {
+      if (!t.alive || t.team !== medic.team || t.hp >= t.maxHp) continue;
+      const dist = Math.hypot(
+        t.cell.x - medic.cell.x,
+        t.cell.y - medic.cell.y,
+        t.cell.z - medic.cell.z
+      );
+      if (dist > range || dist >= bestDist) continue;
+      best = t;
+      bestDist = dist;
+    }
+    return best;
+  }
 
   findTroopNear(guard, reach, team = TEAM.PLAYER) {
     for (const t of this.troops) {
       if (!t.alive || t.team !== team) continue;
-      if (Math.abs(t.cell.x - guard.cell.x) <= reach &&
-          Math.abs(t.cell.z - guard.cell.z) <= reach &&
-          Math.abs(t.cell.y - guard.cell.y) <= 1) return t;
+      if (
+        Math.abs(t.cell.x - guard.cell.x) <= reach &&
+        Math.abs(t.cell.z - guard.cell.z) <= reach &&
+        Math.abs(t.cell.y - guard.cell.y) <= 1
+      )
+        return t;
     }
     return null;
   }
@@ -236,7 +258,9 @@ export class Simulation {
     let bestDist = Infinity;
     for (const t of this.troops) {
       if (!t.alive || t.team !== team) continue;
-      const dx = t.cell.x - guard.cell.x, dy = t.cell.y - guard.cell.y, dz = t.cell.z - guard.cell.z;
+      const dx = t.cell.x - guard.cell.x,
+        dy = t.cell.y - guard.cell.y,
+        dz = t.cell.z - guard.cell.z;
       const dist = Math.hypot(dx, dy, dz);
       if (dist > range || dist < minRange || dist >= bestDist) continue;
       if (!this.hasLOS(guard.cell, t.cell)) continue;
@@ -247,8 +271,12 @@ export class Simulation {
   }
 
   hasLOS(a, b) {
-    const ax = a.x + 0.5, ay = a.y + 0.7, az = a.z + 0.5;
-    const bx = b.x + 0.5, by = b.y + 0.7, bz = b.z + 0.5;
+    const ax = a.x + 0.5,
+      ay = a.y + 0.7,
+      az = a.z + 0.5;
+    const bx = b.x + 0.5,
+      by = b.y + 0.7,
+      bz = b.z + 0.5;
     const dist = Math.hypot(bx - ax, by - ay, bz - az);
     const n = Math.max(1, Math.ceil(dist * 4));
     for (let i = 1; i < n; i++) {
@@ -267,9 +295,14 @@ export class Simulation {
   inObjective(c) {
     const o = this.objective;
     if (!o || o.type !== 'reach') return false;
-    return c.x >= o.from[0] && c.x <= o.to[0] &&
-           c.y >= o.from[1] && c.y <= o.to[1] &&
-           c.z >= o.from[2] && c.z <= o.to[2];
+    return (
+      c.x >= o.from[0] &&
+      c.x <= o.to[0] &&
+      c.y >= o.from[1] &&
+      c.y <= o.to[1] &&
+      c.z >= o.from[2] &&
+      c.z <= o.to[2]
+    );
   }
 
   // ---- world edits ------------------------------------------------------------
@@ -284,25 +317,25 @@ export class Simulation {
 
   // ---- projectiles --------------------------------------------------------------
 
-   /**
-    * A grenadier guard or a troop with a grenade crate lobs a grenade on a parabolic arc; it
-    * explodes on arrival with `damage` over `radius` against everything not on the thrower's team.
-    */
-   throwGrenade(thrower, targetCell, damage, radius = 1, muzzle = 1) {
-     const from = { x: thrower.pos.x, y: thrower.pos.y + muzzle, z: thrower.pos.z };
+  /**
+   * A grenadier guard or a troop with a grenade crate lobs a grenade on a parabolic arc; it
+   * explodes on arrival with `damage` over `radius` against everything not on the thrower's team.
+   */
+  throwGrenade(thrower, targetCell, damage, radius = 1, muzzle = 1) {
+    const from = { x: thrower.pos.x, y: thrower.pos.y + muzzle, z: thrower.pos.z };
     const to = { x: targetCell.x + 0.5, y: targetCell.y, z: targetCell.z + 0.5 };
     const dist = Math.hypot(to.x - from.x, to.z - from.z);
     this.projectiles.push({
       id: this.nextId++,
       kind: 'grenade',
-       team: thrower.team,
+      team: thrower.team,
       from,
       to,
       t: 0,
       duration: 0.4 + dist * 0.1,
       height: 1 + dist * 0.2,
-       damage,
-       radius,
+      damage,
+      radius,
       pos: { ...from },
     });
   }
@@ -323,10 +356,10 @@ export class Simulation {
     this.projectiles = this.projectiles.filter((p) => !p.done);
   }
 
-   /**
-    * Area-of-effect damage to every unit not on `team` within `radius` (horizontal) of `pos`:
-    * enemy grenades hit the player's troops, player grenades hit enemy troops and guards.
-    */
+  /**
+   * Area-of-effect damage to every unit not on `team` within `radius` (horizontal) of `pos`:
+   * enemy grenades hit the player's troops, player grenades hit enemy troops and guards.
+   */
   explode(pos, damage, radius, team = TEAM.ENEMY) {
     this.events.push({ type: 'explosion', pos: { ...pos } });
     for (const t of [...this.troops]) {
@@ -335,13 +368,13 @@ export class Simulation {
       if (Math.hypot(t.pos.x - pos.x, t.pos.z - pos.z) > radius) continue;
       t.takeDamage(damage, this);
     }
-     if (team === TEAM.ENEMY) return;
-     for (const g of [...this.guards]) {
-       if (!g.alive) continue;
-       if (Math.abs(g.pos.y - pos.y) > 1.5) continue;
-       if (Math.hypot(g.pos.x - pos.x, g.pos.z - pos.z) > radius) continue;
-       this.damageUnit(g, damage);
-     }
+    if (team === TEAM.ENEMY) return;
+    for (const g of [...this.guards]) {
+      if (!g.alive) continue;
+      if (Math.abs(g.pos.y - pos.y) > 1.5) continue;
+      if (Math.hypot(g.pos.x - pos.x, g.pos.z - pos.z) > radius) continue;
+      this.damageUnit(g, damage);
+    }
   }
 
   // ---- combat & objective callbacks ----------------------------------------------
@@ -350,7 +383,10 @@ export class Simulation {
   damageUnit(target, amount) {
     if (target instanceof Guard) {
       target.takeDamage(amount);
-      this.events.push({ type: 'hit', pos: { x: target.pos.x, y: target.pos.y + 0.6, z: target.pos.z } });
+      this.events.push({
+        type: 'hit',
+        pos: { x: target.pos.x, y: target.pos.y + 0.6, z: target.pos.z },
+      });
       if (!target.alive) this.events.push({ type: 'guardDead', pos: { ...target.pos } });
     } else {
       target.takeDamage(amount, this);
@@ -367,28 +403,33 @@ export class Simulation {
     this.events.push({ type: 'saved', pos: { ...troop.pos } });
   }
 
-   /**
-    * Crates hand their kit to troops of their team crossing the cell. An exclusive kit needs the
-    * troop's one equipment slot to be free; a stackable one (rules.<kind>Exclusive = false, or the
-    * crate's own flag) goes on top of anything. A troop never takes a kind it already carries.
-    */
+  /**
+   * Crates hand their kit to troops of their team crossing the cell. An exclusive kit needs the
+   * troop's one equipment slot to be free; a stackable one (rules.<kind>Exclusive = false, or the
+   * crate's own flag) goes on top of anything. A troop never takes a kind it already carries.
+   */
   tryPickupCrate(troop) {
     const crate = this.crateAt(troop.cell, troop.team);
     if (!crate) return;
     const def = EQUIPMENT[crate.kind];
-     if (!def || troop.hasKit(crate.kind)) return;
-     const exclusive = isExclusive(crate.kind, this.rules, crate.exclusive);
-     if (exclusive && troop.equipment) return; // the equipment slot is taken
+    if (!def || troop.hasKit(crate.kind)) return;
+    const exclusive = isExclusive(crate.kind, this.rules, crate.exclusive);
+    if (exclusive && troop.equipment) return; // the equipment slot is taken
     crate.remaining--;
-     def.apply(troop, this.rules);
-     troop.addKit(crate.kind, exclusive);
+    def.apply(troop, this.rules);
+    troop.addKit(crate.kind, exclusive);
     this.events.push({ type: 'pickup', pos: { ...troop.pos }, color: def.color });
   }
 
   // ---- player actions -----------------------------------------------------------
 
   budgetFor(kind, key) {
-    const table = kind === 'crate' ? this.budget.crates : kind === 'sign' ? this.budget.signs : this.budget.roles;
+    const table =
+      kind === 'crate'
+        ? this.budget.crates
+        : kind === 'sign'
+          ? this.budget.signs
+          : this.budget.roles;
     return table[key] ?? 0;
   }
 
@@ -398,37 +439,43 @@ export class Simulation {
    */
   isFreeFloorCell(c) {
     const w = this.world;
-    return w.inBounds(c.x, c.y, c.z) &&
+    return (
+      w.inBounds(c.x, c.y, c.z) &&
       w.get(c.x, c.y, c.z) === VOXEL.AIR &&
       w.isSolid(c.x, c.y - 1, c.z) &&
       !this.crateAt(c) &&
       !this.signAt(c) &&
-      !this.guardAt(c);
+      !this.guardAt(c)
+    );
   }
 
   canPlaceCrate(kind, c) {
-    return this.status === GAME_STATUS.PLAYING &&
+    return (
+      this.status === GAME_STATUS.PLAYING &&
       !!EQUIPMENT[kind] &&
       this.budgetFor('crate', kind) > 0 &&
-      this.isFreeFloorCell(c);
+      this.isFreeFloorCell(c)
+    );
   }
 
   placeCrate(kind, c) {
     if (!this.canPlaceCrate(kind, c)) return false;
     this.budget.crates[kind]--;
     const def = EQUIPMENT[kind];
-     // Most kits serve `rules.crateCapacity` troops; a kit may declare its own (the Builder Crate serves one).
-     const capacity = def.capacity ?? this.rules.crateCapacity;
-     this.crates.push(new Crate(this.nextId++, kind, c.x, c.y, c.z, capacity, TEAM.PLAYER));
+    // Most kits serve `rules.crateCapacity` troops; a kit may declare its own (the Builder Crate serves one).
+    const capacity = def.capacity ?? this.rules.crateCapacity;
+    this.crates.push(new Crate(this.nextId++, kind, c.x, c.y, c.z, capacity, TEAM.PLAYER));
     this.events.push({ type: 'crate', pos: center(c), color: def.color });
     return true;
   }
 
   canPlaceSign(kind, c) {
-    return this.status === GAME_STATUS.PLAYING &&
+    return (
+      this.status === GAME_STATUS.PLAYING &&
       !!SIGNS[kind] &&
       this.budgetFor('sign', kind) > 0 &&
-      this.isFreeFloorCell(c);
+      this.isFreeFloorCell(c)
+    );
   }
 
   placeSign(kind, c, dir) {
@@ -481,7 +528,8 @@ export class Simulation {
    * resumed right now (mid-fall or on a ladder).
    */
   toggleRole(troop) {
-    if (!troop || !troop.alive || troop.team !== TEAM.PLAYER || this.status !== GAME_STATUS.PLAYING) return null;
+    if (!troop || !troop.alive || troop.team !== TEAM.PLAYER || this.status !== GAME_STATUS.PLAYING)
+      return null;
     if (troop.role) {
       troop.suspendRole(this);
       this.events.push({ type: 'role', pos: { ...troop.pos }, color: 0x9aa3b8 });
@@ -496,7 +544,6 @@ export class Simulation {
     }
     return null;
   }
-
 
   // ---- end conditions -------------------------------------------------------------
 

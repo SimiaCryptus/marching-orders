@@ -41,24 +41,29 @@ function makeGrenadierGeometry() {
   const body = new THREE.BoxGeometry(0.6, 0.75, 0.46).translate(0, 0.48, 0);
   const head = new THREE.BoxGeometry(0.4, 0.34, 0.4).translate(0, 1.06, 0);
   const visor = new THREE.BoxGeometry(0.32, 0.1, 0.08).translate(0, 1.08, 0.23);
-  const tube = new THREE.CylinderGeometry(0.11, 0.11, 0.9, 8).rotateX(Math.PI / 2).translate(0.32, 1.05, 0.1);
+  const tube = new THREE.CylinderGeometry(0.11, 0.11, 0.9, 8)
+    .rotateX(Math.PI / 2)
+    .translate(0.32, 1.05, 0.1);
   const pack = new THREE.BoxGeometry(0.44, 0.5, 0.2).translate(0, 0.6, -0.32);
   return mergeGeometries([body, head, visor, tube, pack]);
 }
 /** Flat arrow lying in the ground plane, pointing along +z, centred on the origin. */
 function makeFlatArrowGeometry(length, width) {
-   const shape = new THREE.Shape();
-   const hw = width / 2, sw = width * 0.32, head = Math.min(length * 0.5, width * 0.9);
-   const y0 = -length / 2, y1 = length / 2;
-   shape.moveTo(-sw, y0);
-   shape.lineTo(sw, y0);
-   shape.lineTo(sw, y1 - head);
-   shape.lineTo(hw, y1 - head);
-   shape.lineTo(0, y1);
-   shape.lineTo(-hw, y1 - head);
-   shape.lineTo(-sw, y1 - head);
-   shape.closePath();
-   return new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2); // shape +y -> world +z
+  const shape = new THREE.Shape();
+  const hw = width / 2,
+    sw = width * 0.32,
+    head = Math.min(length * 0.5, width * 0.9);
+  const y0 = -length / 2,
+    y1 = length / 2;
+  shape.moveTo(-sw, y0);
+  shape.lineTo(sw, y0);
+  shape.lineTo(sw, y1 - head);
+  shape.lineTo(hw, y1 - head);
+  shape.lineTo(0, y1);
+  shape.lineTo(-hw, y1 - head);
+  shape.lineTo(-sw, y1 - head);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2); // shape +y -> world +z
 }
 const DECAL_Y = 0.03; // ground graphics float just above the floor voxel
 
@@ -114,7 +119,13 @@ class Particles {
     this.geometry.setDrawRange(0, 0);
     this.points = new THREE.Points(
       this.geometry,
-      new THREE.PointsMaterial({ size: 0.28, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }),
+      new THREE.PointsMaterial({
+        size: 0.28,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+      })
     );
     this.points.frustumCulled = false;
     this.tmp = new THREE.Color();
@@ -233,17 +244,17 @@ export class Renderer {
     };
     this.signArrowMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x666666 });
     this.signMeshes = new Map();
-     // Ground graphics under signs and the placement ghost (notes.md: show the effect where it is placed).
-     this.decalArrowGeometry = makeFlatArrowGeometry(0.72, 0.36);
-     this.decalArrowSmallGeometry = makeFlatArrowGeometry(0.5, 0.26);
-     this.signPreview = null;
-     this.signPreviewKey = '';
+    // Ground graphics under signs and the placement ghost (notes.md: show the effect where it is placed).
+    this.decalArrowGeometry = makeFlatArrowGeometry(0.72, 0.36);
+    this.decalArrowSmallGeometry = makeFlatArrowGeometry(0.5, 0.26);
+    this.signPreview = null;
+    this.signPreviewKey = '';
     this.projectileGeometry = new THREE.SphereGeometry(0.13, 8, 6);
-     // Grenades: dark with an orange fuse for the enemy, olive with a green fuse for the player.
-     this.projectileMaterials = {
-       [TEAM.ENEMY]: new THREE.MeshLambertMaterial({ color: 0x2a2f38, emissive: 0x552200 }),
-       [TEAM.PLAYER]: new THREE.MeshLambertMaterial({ color: 0x2f3a2a, emissive: 0x1f5a22 }),
-     };
+    // Grenades: dark with an orange fuse for the enemy, olive with a green fuse for the player.
+    this.projectileMaterials = {
+      [TEAM.ENEMY]: new THREE.MeshLambertMaterial({ color: 0x2a2f38, emissive: 0x552200 }),
+      [TEAM.PLAYER]: new THREE.MeshLambertMaterial({ color: 0x2f3a2a, emissive: 0x1f5a22 }),
+    };
     this.projectileMeshes = new Map();
 
     this.particles = new Particles(3000);
@@ -253,7 +264,7 @@ export class Renderer {
 
     this.cursor = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1.04, 1.04, 1.04)),
-      new THREE.LineBasicMaterial({ color: 0xffffff }),
+      new THREE.LineBasicMaterial({ color: 0xffffff })
     );
     this.cursor.visible = false;
     this.dynamic.add(this.cursor);
@@ -293,18 +304,24 @@ export class Renderer {
     }
     this.bounds = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(world.w, world.h, world.d)),
-      new THREE.LineBasicMaterial({ color: 0x7fa0d0, transparent: true, opacity: 0.55 }),
+      new THREE.LineBasicMaterial({ color: 0x7fa0d0, transparent: true, opacity: 0.55 })
     );
     this.bounds.position.set(world.w / 2, world.h / 2, world.d / 2);
     this.bounds.visible = this.showBounds;
     this.dynamic.add(this.bounds);
 
-    const cx = world.w / 2, cz = world.d / 2;
+    const cx = world.w / 2,
+      cz = world.d / 2;
     this.sun.position.set(cx + world.w * 0.5, world.h + world.w * 0.6, cz + world.d * 0.8);
     this.sun.target.position.set(cx, 0, cz);
     const r = Math.max(world.w, world.d) * 0.8;
     const sc = this.sun.shadow.camera;
-    sc.left = -r; sc.right = r; sc.top = r; sc.bottom = -r; sc.near = 1; sc.far = 300;
+    sc.left = -r;
+    sc.right = r;
+    sc.top = r;
+    sc.bottom = -r;
+    sc.near = 1;
+    sc.far = 300;
     sc.updateProjectionMatrix();
     if (resetCamera) this.resetView();
     else this.controls.update();
@@ -314,7 +331,9 @@ export class Renderer {
   resetView() {
     const world = this.world;
     if (!world) return;
-    const cx = world.w / 2, cy = world.h / 3, cz = world.d / 2;
+    const cx = world.w / 2,
+      cy = world.h / 3,
+      cz = world.d / 2;
     this.controls.target.set(cx, cy, cz);
     this.camera.position.set(cx - world.w * 0.2, world.h * 1.4 + 8, cz + world.d * 1.7);
     if (this.isometric) this.applyIsometric();
@@ -330,9 +349,9 @@ export class Renderer {
     this.decor.clear();
     for (const [, m] of this.crateMeshes) this.dynamic.remove(m);
     this.crateMeshes.clear();
-     for (const [, g] of this.signMeshes) this.disposeSignGroup(g);
+    for (const [, g] of this.signMeshes) this.disposeSignGroup(g);
     this.signMeshes.clear();
-     this.setSignPreview(null);
+    this.setSignPreview(null);
     for (const [, m] of this.projectileMeshes) this.dynamic.remove(m);
     this.projectileMeshes.clear();
     for (const t of this.tracers) this.dynamic.remove(t.line);
@@ -348,12 +367,19 @@ export class Renderer {
       const geo = new THREE.BoxGeometry(size[0], size[1], size[2]);
       const zone = new THREE.Mesh(
         geo,
-        new THREE.MeshBasicMaterial({ color: 0xffdd55, transparent: true, opacity: 0.12, depthWrite: false }),
+        new THREE.MeshBasicMaterial({
+          color: 0xffdd55,
+          transparent: true,
+          opacity: 0.12,
+          depthWrite: false,
+        })
       );
-      zone.add(new THREE.LineSegments(
-        new THREE.EdgesGeometry(geo),
-        new THREE.LineBasicMaterial({ color: 0xffdd55, transparent: true, opacity: 0.7 }),
-      ));
+      zone.add(
+        new THREE.LineSegments(
+          new THREE.EdgesGeometry(geo),
+          new THREE.LineBasicMaterial({ color: 0xffdd55, transparent: true, opacity: 0.7 })
+        )
+      );
       zone.position.set(o.from[0] + size[0] / 2, o.from[1] + size[1] / 2, o.from[2] + size[2] / 2);
       this.decor.add(zone);
     }
@@ -366,22 +392,27 @@ export class Renderer {
     const pod = new THREE.Group();
     const hull = new THREE.Mesh(
       new THREE.CylinderGeometry(0.7, 0.5, 1.4, 8),
-      new THREE.MeshLambertMaterial({ color: hullColor, emissive: enemy ? 0x55201a : 0x1a3a55 }),
+      new THREE.MeshLambertMaterial({ color: hullColor, emissive: enemy ? 0x55201a : 0x1a3a55 })
     );
     const nose = new THREE.Mesh(
       new THREE.ConeGeometry(0.7, 0.7, 8),
-      new THREE.MeshLambertMaterial({ color: enemy ? 0xffd8cc : 0xdff3ff }),
+      new THREE.MeshLambertMaterial({ color: enemy ? 0xffd8cc : 0xdff3ff })
     );
     nose.position.y = 1.05;
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.5, 0.75, 16).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: hullColor, transparent: true, opacity: 0.6, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({
+        color: hullColor,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.DoubleSide,
+      })
     );
     ring.position.y = -2.18;
     const f = DIRS[sp.dir];
     const marker = new THREE.Mesh(
       new THREE.ConeGeometry(0.2, 0.5, 6).rotateX(Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: hullColor, transparent: true, opacity: 0.8 }),
+      new THREE.MeshBasicMaterial({ color: hullColor, transparent: true, opacity: 0.8 })
     );
     marker.position.set(f.dx * 0.95, -2.15, f.dz * 0.95);
     marker.rotation.y = Math.atan2(f.dx, f.dz);
@@ -416,11 +447,11 @@ export class Renderer {
 
   syncUnits(sim) {
     this.troops.update(sim.troops, (t, color) => {
-       const kit = t.displayKit;
+      const kit = t.displayKit;
       if (t.team === TEAM.ENEMY) {
         // Enemy troops stay recognisably red; equipment only tints them.
         color.setHex(TEAM_COLORS.enemy);
-         if (kit) color.lerp(this.tmpColor.setHex(EQUIPMENT[kit].color), 0.45);
+        if (kit) color.lerp(this.tmpColor.setHex(EQUIPMENT[kit].color), 0.45);
       } else {
         if (t.role) {
           color.setHex(t.role.color);
@@ -433,10 +464,13 @@ export class Renderer {
       if (t.flash > 0) color.lerp(WHITE, t.flash * 0.8);
     });
     for (const [type, batch] of Object.entries(this.guardBatches)) {
-      batch.update(sim.guards.filter((g) => g.type === type), (g, color) => {
-        color.setHex(g.def.color);
-        if (g.flash > 0) color.lerp(WHITE, g.flash * 0.8);
-      });
+      batch.update(
+        sim.guards.filter((g) => g.type === type),
+        (g, color) => {
+          color.setHex(g.def.color);
+          if (g.flash > 0) color.lerp(WHITE, g.flash * 0.8);
+        }
+      );
     }
     this.syncCrates(sim.crates);
     this.syncSigns(sim.signs);
@@ -453,9 +487,18 @@ export class Renderer {
         const enemy = c.team === TEAM.ENEMY;
         mesh = new THREE.Mesh(
           this.crateGeometry,
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: enemy ? 0.1 : 0.25 }),
+          new THREE.MeshLambertMaterial({
+            color,
+            emissive: color,
+            emissiveIntensity: enemy ? 0.1 : 0.25,
+          })
         );
-        mesh.add(new THREE.LineSegments(this.crateEdges, new THREE.LineBasicMaterial({ color: enemy ? 0xff3838 : 0x222222 })));
+        mesh.add(
+          new THREE.LineSegments(
+            this.crateEdges,
+            new THREE.LineBasicMaterial({ color: enemy ? 0xff3838 : 0x222222 })
+          )
+        );
         mesh.castShadow = true;
         mesh.position.set(c.x + 0.5, c.y + 0.25, c.z + 0.5);
         this.dynamic.add(mesh);
@@ -481,7 +524,11 @@ export class Renderer {
     const post = new THREE.Mesh(this.signPostGeometry, this.signPostMaterials[team]);
     const plate = new THREE.Mesh(
       this.signPlateGeometry,
-      new THREE.MeshLambertMaterial({ color: def.color, emissive: def.color, emissiveIntensity: team === TEAM.ENEMY ? 0.15 : 0.3 }),
+      new THREE.MeshLambertMaterial({
+        color: def.color,
+        emissive: def.color,
+        emissiveIntensity: team === TEAM.ENEMY ? 0.15 : 0.3,
+      })
     );
     const frame = new THREE.Mesh(this.signFrameGeometry, this.signFrameMaterials[team]);
     plate.castShadow = true;
@@ -494,103 +541,143 @@ export class Renderer {
       arrow.rotation.y = a.yaw;
       group.add(arrow);
     }
-     group.add(this.makeSignDecal(sign.kind, def.color, team === TEAM.ENEMY ? 0.45 : 0.8));
-     group.userData.materials = [plate.material];
+    group.add(this.makeSignDecal(sign.kind, def.color, team === TEAM.ENEMY ? 0.45 : 0.8));
+    group.userData.materials = [plate.material];
     group.userData.pickables = [post, plate, frame];
     return group;
   }
-   /**
-    * Ground graphic drawn under a sign (and under the placement ghost) in the sign's local frame
-    * (+z = the way it faces, +x = its left): the direction troops will take, the side entries of
-    * a forward sign, or the funnel of a fan sign.
-    */
-   makeSignDecal(kind, hex, opacity) {
-     const def = SIGNS[kind];
-     const group = new THREE.Group();
-     const fill = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false });
-     const line = new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity });
-     group.userData.materials = [fill, line];
-     group.userData.geometries = [];
-     const arrow = (x, z, yaw, small = false) => {
-       const m = new THREE.Mesh(small ? this.decalArrowSmallGeometry : this.decalArrowGeometry, fill);
-       m.position.set(x, DECAL_Y, z);
-       m.rotation.y = yaw;
-       group.add(m);
-     };
-     const polyline = (points) => {
-       const geo = new THREE.BufferGeometry().setFromPoints(points.map(([x, z]) => new THREE.Vector3(x, DECAL_Y, z)));
-       group.userData.geometries.push(geo);
-       group.add(new THREE.Line(geo, line));
-     };
-     switch (kind) {
-       case 'arrow':
-         arrow(0, 0, 0);
-         break;
-       case 'forward':
-         arrow(0, 0.08, 0);
-         arrow(0.8, -0.1, -Math.PI / 2, true); // from the left neighbour into the cell...
-         arrow(-0.8, -0.1, Math.PI / 2, true); // ...and from the right: both leave along +z
-         break;
-       case 'fan': {
-         const r = def.radius;
-         // Funnel walls from the sign's lane out to `radius` lanes either side, `radius` cells ahead.
-         polyline([[-0.5, 0.5], [-(r + 0.5), r + 0.5]]);
-         polyline([[0.5, 0.5], [r + 0.5, r + 0.5]]);
-         polyline([[-0.5, 0.5], [0.5, 0.5]]);
-         arrow(0, 0, 0);                                     // marching this way...
-         for (const x of [-1, 0, 1]) arrow(x, 1.15, 0, true); // ...spreads over three lanes
-         arrow(-r, r + 0.15, Math.PI * 0.75, true);          // marching back in from the mouth funnels in
-         arrow(r, r + 0.15, -Math.PI * 0.75, true);
-         break;
-       }
-       case 'blocker':
-       default:
-         polyline([[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45], [-0.45, -0.45]]);
-         polyline([[-0.3, -0.3], [0.3, 0.3]]);
-         polyline([[-0.3, 0.3], [0.3, -0.3]]);
-         break;
-     }
-     return group;
-   }
-   /** Translucent sign with its ground graphic: what a placement would look like. */
-   makeSignGhost(kind, ok) {
-     const hex = ok ? SIGNS[kind].color : 0xff6a6a;
-     const group = new THREE.Group();
-     const mat = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.35, depthWrite: false });
-     group.userData.materials = [mat];
-     group.add(new THREE.Mesh(this.signPostGeometry, mat), new THREE.Mesh(this.signPlateGeometry, mat));
-     group.add(this.makeSignDecal(kind, hex, ok ? 0.9 : 0.6));
-     return group;
-   }
-   /**
-    * Show a ghost of the sign about to be planted on `cell`, facing `dir` (DIRS index), tinted red
-    * when the placement is not allowed. Call with no kind / cell to hide it.
-    */
-   setSignPreview(kind, cell = null, dir = 0, ok = true) {
-     if (!kind || !cell) {
-       if (this.signPreview) this.signPreview.visible = false;
-       return;
-     }
-     const key = `${kind}:${ok}`;
-     if (!this.signPreview || this.signPreviewKey !== key) {
-       if (this.signPreview) this.disposeSignGroup(this.signPreview);
-       this.signPreview = this.makeSignGhost(kind, ok);
-       this.signPreviewKey = key;
-       this.dynamic.add(this.signPreview);
-     }
-     const f = DIRS[dir];
-     this.signPreview.visible = true;
-     this.signPreview.position.set(cell.x + 0.5, cell.y, cell.z + 0.5);
-     this.signPreview.rotation.y = Math.atan2(f.dx, f.dz);
-   }
-   /** Remove a sign group (placed sign or ghost) and free the GPU resources it owns. */
-   disposeSignGroup(group) {
-     this.dynamic.remove(group);
-     group.traverse((o) => {
-       for (const m of o.userData.materials || []) m.dispose();
-       for (const g of o.userData.geometries || []) g.dispose();
-     });
-   }
+  /**
+   * Ground graphic drawn under a sign (and under the placement ghost) in the sign's local frame
+   * (+z = the way it faces, +x = its left): the direction troops will take, the side entries of
+   * a forward sign, or the funnel of a fan sign.
+   */
+  makeSignDecal(kind, hex, opacity) {
+    const def = SIGNS[kind];
+    const group = new THREE.Group();
+    const fill = new THREE.MeshBasicMaterial({
+      color: hex,
+      transparent: true,
+      opacity,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const line = new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity });
+    group.userData.materials = [fill, line];
+    group.userData.geometries = [];
+    const arrow = (x, z, yaw, small = false) => {
+      const m = new THREE.Mesh(
+        small ? this.decalArrowSmallGeometry : this.decalArrowGeometry,
+        fill
+      );
+      m.position.set(x, DECAL_Y, z);
+      m.rotation.y = yaw;
+      group.add(m);
+    };
+    const polyline = (points) => {
+      const geo = new THREE.BufferGeometry().setFromPoints(
+        points.map(([x, z]) => new THREE.Vector3(x, DECAL_Y, z))
+      );
+      group.userData.geometries.push(geo);
+      group.add(new THREE.Line(geo, line));
+    };
+    switch (kind) {
+      case 'arrow':
+        arrow(0, 0, 0);
+        break;
+      case 'forward':
+        arrow(0, 0.08, 0);
+        arrow(0.8, -0.1, -Math.PI / 2, true); // from the left neighbour into the cell...
+        arrow(-0.8, -0.1, Math.PI / 2, true); // ...and from the right: both leave along +z
+        break;
+      case 'fan': {
+        const r = def.radius;
+        // Funnel walls from the sign's lane out to `radius` lanes either side, `radius` cells ahead.
+        polyline([
+          [-0.5, 0.5],
+          [-(r + 0.5), r + 0.5],
+        ]);
+        polyline([
+          [0.5, 0.5],
+          [r + 0.5, r + 0.5],
+        ]);
+        polyline([
+          [-0.5, 0.5],
+          [0.5, 0.5],
+        ]);
+        arrow(0, 0, 0); // marching this way...
+        for (const x of [-1, 0, 1]) arrow(x, 1.15, 0, true); // ...spreads over three lanes
+        arrow(-r, r + 0.15, Math.PI * 0.75, true); // marching back in from the mouth funnels in
+        arrow(r, r + 0.15, -Math.PI * 0.75, true);
+        break;
+      }
+      case 'blocker':
+      default:
+        polyline([
+          [-0.45, -0.45],
+          [0.45, -0.45],
+          [0.45, 0.45],
+          [-0.45, 0.45],
+          [-0.45, -0.45],
+        ]);
+        polyline([
+          [-0.3, -0.3],
+          [0.3, 0.3],
+        ]);
+        polyline([
+          [-0.3, 0.3],
+          [0.3, -0.3],
+        ]);
+        break;
+    }
+    return group;
+  }
+  /** Translucent sign with its ground graphic: what a placement would look like. */
+  makeSignGhost(kind, ok) {
+    const hex = ok ? SIGNS[kind].color : 0xff6a6a;
+    const group = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({
+      color: hex,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+    });
+    group.userData.materials = [mat];
+    group.add(
+      new THREE.Mesh(this.signPostGeometry, mat),
+      new THREE.Mesh(this.signPlateGeometry, mat)
+    );
+    group.add(this.makeSignDecal(kind, hex, ok ? 0.9 : 0.6));
+    return group;
+  }
+  /**
+   * Show a ghost of the sign about to be planted on `cell`, facing `dir` (DIRS index), tinted red
+   * when the placement is not allowed. Call with no kind / cell to hide it.
+   */
+  setSignPreview(kind, cell = null, dir = 0, ok = true) {
+    if (!kind || !cell) {
+      if (this.signPreview) this.signPreview.visible = false;
+      return;
+    }
+    const key = `${kind}:${ok}`;
+    if (!this.signPreview || this.signPreviewKey !== key) {
+      if (this.signPreview) this.disposeSignGroup(this.signPreview);
+      this.signPreview = this.makeSignGhost(kind, ok);
+      this.signPreviewKey = key;
+      this.dynamic.add(this.signPreview);
+    }
+    const f = DIRS[dir];
+    this.signPreview.visible = true;
+    this.signPreview.position.set(cell.x + 0.5, cell.y, cell.z + 0.5);
+    this.signPreview.rotation.y = Math.atan2(f.dx, f.dz);
+  }
+  /** Remove a sign group (placed sign or ghost) and free the GPU resources it owns. */
+  disposeSignGroup(group) {
+    this.dynamic.remove(group);
+    group.traverse((o) => {
+      for (const m of o.userData.materials || []) m.dispose();
+      for (const g of o.userData.geometries || []) g.dispose();
+    });
+  }
 
   syncSigns(signs) {
     const seen = new Set();
@@ -608,7 +695,7 @@ export class Renderer {
     }
     for (const [id, group] of this.signMeshes) {
       if (!seen.has(id)) {
-         this.disposeSignGroup(group);
+        this.disposeSignGroup(group);
         this.signMeshes.delete(id);
       }
     }
@@ -620,8 +707,8 @@ export class Renderer {
       seen.add(p.id);
       let mesh = this.projectileMeshes.get(p.id);
       if (!mesh) {
-         const material = this.projectileMaterials[p.team === TEAM.ENEMY ? TEAM.ENEMY : TEAM.PLAYER];
-         mesh = new THREE.Mesh(this.projectileGeometry, material);
+        const material = this.projectileMaterials[p.team === TEAM.ENEMY ? TEAM.ENEMY : TEAM.PLAYER];
+        mesh = new THREE.Mesh(this.projectileGeometry, material);
         mesh.castShadow = true;
         this.dynamic.add(mesh);
         this.projectileMeshes.set(p.id, mesh);
@@ -639,17 +726,39 @@ export class Renderer {
   consumeEvents(events) {
     for (const ev of events) {
       switch (ev.type) {
-        case 'tracer': this.addTracer(ev.from, ev.to, ev.color ?? 0xfff3a0); break;
-        case 'hit': this.particles.burst(ev.pos, 0xffffff, 6, 2); break;
-        case 'death': this.particles.burst(ev.pos, ev.team === TEAM.ENEMY ? 0xff7a5a : 0x77ff77, 22, 4); break;
-        case 'guardDead': this.particles.burst(ev.pos, 0xff5555, 40, 5); break;
-        case 'dig': this.particles.burst(ev.pos, 0xa0703a, 16, 3); break;
-        case 'build': this.particles.burst(ev.pos, 0xe0b060, 10, 2); break;
-        case 'saved': this.particles.burst(ev.pos, 0xffe066, 18, 3); break;
-        case 'spawn': this.particles.burst(ev.pos, ev.team === TEAM.ENEMY ? 0xff8a6a : 0x8fd3ff, 8, 2); break;
-        case 'land': this.particles.burst(ev.pos, 0x9a8a70, 5, 1.5); break;
-         case 'heal': this.particles.burst(ev.pos, 0x7cffb0, 8, 1.5); break;
-         case 'parachute': this.particles.burst(ev.pos, 0xffffff, 14, 2); break;
+        case 'tracer':
+          this.addTracer(ev.from, ev.to, ev.color ?? 0xfff3a0);
+          break;
+        case 'hit':
+          this.particles.burst(ev.pos, 0xffffff, 6, 2);
+          break;
+        case 'death':
+          this.particles.burst(ev.pos, ev.team === TEAM.ENEMY ? 0xff7a5a : 0x77ff77, 22, 4);
+          break;
+        case 'guardDead':
+          this.particles.burst(ev.pos, 0xff5555, 40, 5);
+          break;
+        case 'dig':
+          this.particles.burst(ev.pos, 0xa0703a, 16, 3);
+          break;
+        case 'build':
+          this.particles.burst(ev.pos, 0xe0b060, 10, 2);
+          break;
+        case 'saved':
+          this.particles.burst(ev.pos, 0xffe066, 18, 3);
+          break;
+        case 'spawn':
+          this.particles.burst(ev.pos, ev.team === TEAM.ENEMY ? 0xff8a6a : 0x8fd3ff, 8, 2);
+          break;
+        case 'land':
+          this.particles.burst(ev.pos, 0x9a8a70, 5, 1.5);
+          break;
+        case 'heal':
+          this.particles.burst(ev.pos, 0x7cffb0, 8, 1.5);
+          break;
+        case 'parachute':
+          this.particles.burst(ev.pos, 0xffffff, 14, 2);
+          break;
         case 'explosion':
           this.particles.burst(ev.pos, 0xff8a3c, 40, 5);
           this.particles.burst(ev.pos, 0x444444, 14, 2.5);
@@ -658,8 +767,11 @@ export class Renderer {
         case 'crate':
         case 'sign':
         case 'pickupSign':
-        case 'role': this.particles.burst(ev.pos, ev.color ?? 0xffffff, 12, 2); break;
-        default: break;
+        case 'role':
+          this.particles.burst(ev.pos, ev.color ?? 0xffffff, 12, 2);
+          break;
+        default:
+          break;
       }
     }
   }
@@ -669,19 +781,35 @@ export class Renderer {
       new THREE.Vector3(from.x, from.y, from.z),
       new THREE.Vector3(to.x, to.y, to.z),
     ]);
-    const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: 1 }));
+    const line = new THREE.Line(
+      geometry,
+      new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: 1 })
+    );
     this.dynamic.add(line);
     this.tracers.push({ line, ttl: 0.18, max: 0.18 });
   }
 
   /** Highlight one cell, or the box spanning `cell`..`to` when `to` is given. */
   setCursor(cell, hex, to = null) {
-    if (!cell) { this.cursor.visible = false; return; }
+    if (!cell) {
+      this.cursor.visible = false;
+      return;
+    }
     const b = to || cell;
-    const x0 = Math.min(cell.x, b.x), y0 = Math.min(cell.y, b.y), z0 = Math.min(cell.z, b.z);
-    this.cursorSize.set(Math.abs(cell.x - b.x) + 1, Math.abs(cell.y - b.y) + 1, Math.abs(cell.z - b.z) + 1);
+    const x0 = Math.min(cell.x, b.x),
+      y0 = Math.min(cell.y, b.y),
+      z0 = Math.min(cell.z, b.z);
+    this.cursorSize.set(
+      Math.abs(cell.x - b.x) + 1,
+      Math.abs(cell.y - b.y) + 1,
+      Math.abs(cell.z - b.z) + 1
+    );
     this.cursor.visible = true;
-    this.cursor.position.set(x0 + this.cursorSize.x / 2, y0 + this.cursorSize.y / 2, z0 + this.cursorSize.z / 2);
+    this.cursor.position.set(
+      x0 + this.cursorSize.x / 2,
+      y0 + this.cursorSize.y / 2,
+      z0 + this.cursorSize.z / 2
+    );
     this.cursor.material.color.setHex(hex ?? 0xffffff);
   }
 
@@ -738,7 +866,11 @@ export class Renderer {
 
   /** Objects the input system may raycast against. */
   pickables() {
-    const list = [...this.chunkMeshes.values(), this.troops.mesh, ...Object.values(this.guardBatches).map((b) => b.mesh)];
+    const list = [
+      ...this.chunkMeshes.values(),
+      this.troops.mesh,
+      ...Object.values(this.guardBatches).map((b) => b.mesh),
+    ];
     for (const g of this.signMeshes.values()) list.push(...g.userData.pickables);
     return list;
   }

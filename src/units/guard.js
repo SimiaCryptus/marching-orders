@@ -11,17 +11,40 @@ import { DEFAULT_RULES } from '../rules.js';
  */
 export const GUARD_TYPES = Object.freeze({
   sentry: {
-    label: 'Sentry', hp: 30, attack: 4, cooldown: 1.2, reach: 1, range: 0,
-    color: 0xd24a4a, muzzle: 1.0,
+    label: 'Sentry',
+    hp: 30,
+    attack: 4,
+    cooldown: 1.2,
+    reach: 1,
+    range: 0,
+    color: 0xd24a4a,
+    muzzle: 1.0,
   },
   turret: {
-    label: 'Turret', hp: 40, attack: 2, cooldown: 0.5, reach: 0, range: 6,
-    projectile: 'bullet', color: 0x9aa3b8, muzzle: 0.85,
+    label: 'Turret',
+    hp: 40,
+    attack: 2,
+    cooldown: 0.5,
+    reach: 0,
+    range: 6,
+    projectile: 'bullet',
+    color: 0x9aa3b8,
+    muzzle: 0.85,
   },
   grenadier: {
-    label: 'Grenadier', hp: 25, attack: 2, cooldown: 1.0, reach: 1,
-    range: 7, minRange: 2, rangedCooldown: 3.0, rangedAttack: 6, splash: 1.5,
-    projectile: 'grenade', color: 0xc27a2e, muzzle: 1.1,
+    label: 'Grenadier',
+    hp: 25,
+    attack: 2,
+    cooldown: 1.0,
+    reach: 1,
+    range: 7,
+    minRange: 2,
+    rangedCooldown: 3.0,
+    rangedAttack: 6,
+    splash: 1.5,
+    projectile: 'grenade',
+    color: 0xc27a2e,
+    muzzle: 1.1,
   },
 });
 
@@ -31,26 +54,26 @@ export const GUARD_TYPES = Object.freeze({
  * State machine is idle -> engage (alert/retreat are stretch goals).
  */
 export class Guard {
-   constructor(id, type, x, y, z, dir = 2, rules = DEFAULT_RULES) {
+  constructor(id, type, x, y, z, dir = 2, rules = DEFAULT_RULES) {
     this.id = id;
     this.type = GUARD_TYPES[type] ? type : 'sentry';
     this.def = GUARD_TYPES[this.type];
     this.cell = { x, y, z };
     this.pos = { x: x + 0.5, y, z: z + 0.5 };
     this.dir = dir;
-     // Base stats scaled by the level's rules (guardHpScale / guardDamageScale / guardRangeScale).
-     this.maxHp = Math.max(1, Math.round(this.def.hp * rules.guardHpScale));
-     this.hp = this.maxHp;
-     this.attack = this.def.attack * rules.guardDamageScale;
-     this.rangedAttack = (this.def.rangedAttack ?? this.def.attack) * rules.guardDamageScale;
+    // Base stats scaled by the level's rules (guardHpScale / guardDamageScale / guardRangeScale).
+    this.maxHp = Math.max(1, Math.round(this.def.hp * rules.guardHpScale));
+    this.hp = this.maxHp;
+    this.attack = this.def.attack * rules.guardDamageScale;
+    this.rangedAttack = (this.def.rangedAttack ?? this.def.attack) * rules.guardDamageScale;
     this.cooldown = this.def.cooldown;
     this.reach = this.def.reach;
-     this.range = this.def.range * rules.guardRangeScale;
-     this.minRange = (this.def.minRange ?? 0) * rules.guardRangeScale;
+    this.range = this.def.range * rules.guardRangeScale;
+    this.minRange = (this.def.minRange ?? 0) * rules.guardRangeScale;
     this.attackTimer = 0;
     this.flash = 0;
     this.state = 'idle';
-     this.team = TEAM.ENEMY; // guards only ever engage the player's troops
+    this.team = TEAM.ENEMY; // guards only ever engage the player's troops
   }
 
   get alive() {
@@ -64,9 +87,9 @@ export class Guard {
 
     let target = null;
     let ranged = false;
-     if (this.reach > 0) target = sim.findTroopNear(this, this.reach, TEAM.PLAYER);
-     if (!target && this.range > 0) {
-       target = sim.findTroopInRange(this, this.range, this.minRange, TEAM.PLAYER);
+    if (this.reach > 0) target = sim.findTroopNear(this, this.reach, TEAM.PLAYER);
+    if (!target && this.range > 0) {
+      target = sim.findTroopInRange(this, this.range, this.minRange, TEAM.PLAYER);
       ranged = !!target;
     }
     if (!target) {
@@ -78,7 +101,8 @@ export class Guard {
     const dx = target.cell.x - this.cell.x;
     const dz = target.cell.z - this.cell.z;
     if (dx !== 0 || dz !== 0) {
-      this.dir = Math.abs(dx) >= Math.abs(dz) ? dirIndexFromVector(dx, 0) : dirIndexFromVector(0, dz);
+      this.dir =
+        Math.abs(dx) >= Math.abs(dz) ? dirIndexFromVector(dx, 0) : dirIndexFromVector(0, dz);
     }
     if (this.attackTimer > 0) return;
 
@@ -89,10 +113,16 @@ export class Guard {
     }
     this.attackTimer = this.def.rangedCooldown ?? this.cooldown;
     if (this.def.projectile === 'grenade') {
-       sim.throwGrenade(this, target.cell, this.rangedAttack, this.def.splash ?? 1, this.def.muzzle ?? 1);
+      sim.throwGrenade(
+        this,
+        target.cell,
+        this.rangedAttack,
+        this.def.splash ?? 1,
+        this.def.muzzle ?? 1
+      );
       return;
     }
-     target.takeDamage(this.rangedAttack, sim);
+    target.takeDamage(this.rangedAttack, sim);
     sim.events.push({
       type: 'tracer',
       from: { x: this.pos.x, y: this.pos.y + this.def.muzzle, z: this.pos.z },

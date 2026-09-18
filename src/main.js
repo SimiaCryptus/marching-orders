@@ -21,22 +21,34 @@ const MODE = Object.freeze({ PLAY: 'play', EDIT: 'edit' });
 /** Player palette: crates, then signs — hotkeys along the number row (1..9, 0, -, =) in that order. */
 const HOTKEYS = '1234567890-=[';
 const TOOLS = [
-  ...Object.entries(EQUIPMENT).map(([key, def]) => ({ id: `crate:${key}`, kind: 'crate', key, label: def.label, color: def.color })),
-  ...Object.entries(SIGNS).map(([key, def]) => ({ id: `sign:${key}`, kind: 'sign', key, label: def.label, color: def.color })),
+  ...Object.entries(EQUIPMENT).map(([key, def]) => ({
+    id: `crate:${key}`,
+    kind: 'crate',
+    key,
+    label: def.label,
+    color: def.color,
+  })),
+  ...Object.entries(SIGNS).map(([key, def]) => ({
+    id: `sign:${key}`,
+    kind: 'sign',
+    key,
+    label: def.label,
+    color: def.color,
+  })),
 ].map((t, i) => ({ ...t, hotkey: HOTKEYS[i] ?? null }));
 const HOTKEY_RANGE = `${TOOLS[0].hotkey}…${TOOLS.filter((t) => t.hotkey).pop().hotkey}`;
 
 const DEFAULT_HINT =
-    `Pick a crate or a sign (${HOTKEY_RANGE}, or ▾ for the whole list), then click the map — even through a crowd. ` +
-   'Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ' +
-   'right-click or shift-click a placed sign to pick it up, or a troop with a builder kit to start / pause its staircase. ' +
-   'V resets the view, M opens the menu.';
+  `Pick a crate or a sign (${HOTKEY_RANGE}, or ▾ for the whole list), then click the map — even through a crowd. ` +
+  'Q / mouse wheel rotate the sign you are about to plant (its ghost shows where troops will go); ' +
+  'right-click or shift-click a placed sign to pick it up, or a troop with a builder kit to start / pause its staircase. ' +
+  'V resets the view, M opens the menu.';
 
 /**
  * Startup options from the page URL:
  *   ?level=<url>     fetch a level JSON file (relative or absolute URL)
  *   #level=<data>    play a level embedded in the URL (created by the designer's "Copy play link")
-  *   ?campaign=<n>    play level n (1-based) of the generated campaign
+ *   ?campaign=<n>    play level n (1-based) of the generated campaign
  *   ?edit  /  #edit  open the level designer instead of playing
  */
 function readStartupOptions() {
@@ -45,7 +57,7 @@ function readStartupOptions() {
   return {
     levelUrl: query.get('level'),
     levelData: hash.get('level'),
-     campaign: query.get('campaign') ?? hash.get('campaign'),
+    campaign: query.get('campaign') ?? hash.get('campaign'),
     edit: query.has('edit') || hash.has('edit'),
   };
 }
@@ -63,8 +75,8 @@ class Game {
       onOpenEditor: () => this.openEditor(),
       onToggleMenu: (open) => this.toggleMenu(open),
       onResetView: () => this.renderer.resetView(),
-       onStartCampaign: () => this.startCampaign(),
-       onNextLevel: () => this.playNextCampaignLevel(),
+      onStartCampaign: () => this.startCampaign(),
+      onNextLevel: () => this.playNextCampaignLevel(),
     });
     this.editor = new Editor(editorRoot, this.renderer, {
       onPlay: (level) => this.playLevel(level, { keepCamera: true }),
@@ -103,13 +115,13 @@ class Game {
     try {
       if (opts.levelData) level = decodeLevelHash(opts.levelData);
       else if (opts.levelUrl) level = await loadLevel(new URL(opts.levelUrl, location.href));
-       else if (opts.campaign !== null) {
-         const n = Number(opts.campaign);
-         if (!Number.isInteger(n) || n < 1 || n > CAMPAIGN_LENGTH) {
-           throw new Error(`campaign must be a number between 1 and ${CAMPAIGN_LENGTH}`);
-         }
-         level = buildCampaignLevel(n - 1);
-       }
+      else if (opts.campaign !== null) {
+        const n = Number(opts.campaign);
+        if (!Number.isInteger(n) || n < 1 || n > CAMPAIGN_LENGTH) {
+          throw new Error(`campaign must be a number between 1 and ${CAMPAIGN_LENGTH}`);
+        }
+        level = buildCampaignLevel(n - 1);
+      }
     } catch (err) {
       console.error(err);
       warning = `Could not load the requested level: ${err.message}. Loaded the tutorial instead.`;
@@ -160,26 +172,28 @@ class Game {
     this.mode = MODE.EDIT;
     this.selectTool(null);
     this.renderer.setCursor(null);
-     this.renderer.setSignPreview(null);
+    this.renderer.setSignPreview(null);
     this.hud.setVisible(false);
     this.editor.open(this.level, { keepCamera: !!this.sim });
   }
-   /** Index of the campaign level after the current one, or null when this is not a campaign level / it is the last. */
-   get nextCampaignIndex() {
-     const c = this.level && this.level.campaign;
-     if (!c || !Number.isInteger(c.index)) return null;
-     return c.index + 1 < CAMPAIGN_LENGTH ? c.index + 1 : null;
-   }
-   /** Play a level of the generated standard progression (0-based). */
-   startCampaign(index = 0) {
-     this.playLevel(buildCampaignLevel(index));
-   }
-   playNextCampaignLevel() {
-     const next = this.nextCampaignIndex;
-     if (next === null) { this.hud.showToast('That was the last campaign level — the tower is yours!', 3000); return; }
-     this.startCampaign(next);
-   }
-
+  /** Index of the campaign level after the current one, or null when this is not a campaign level / it is the last. */
+  get nextCampaignIndex() {
+    const c = this.level && this.level.campaign;
+    if (!c || !Number.isInteger(c.index)) return null;
+    return c.index + 1 < CAMPAIGN_LENGTH ? c.index + 1 : null;
+  }
+  /** Play a level of the generated standard progression (0-based). */
+  startCampaign(index = 0) {
+    this.playLevel(buildCampaignLevel(index));
+  }
+  playNextCampaignLevel() {
+    const next = this.nextCampaignIndex;
+    if (next === null) {
+      this.hud.showToast('That was the last campaign level — the tower is yours!', 3000);
+      return;
+    }
+    this.startCampaign(next);
+  }
 
   // ---- frame ----------------------------------------------------------------------
 
@@ -217,7 +231,7 @@ class Game {
     if (sim.status !== GAME_STATUS.PLAYING && !this.ended) {
       this.ended = true;
       this.selectTool(null);
-       this.hud.showEnd(sim.status, sim, { hasNext: this.nextCampaignIndex !== null });
+      this.hud.showEnd(sim.status, sim, { hasNext: this.nextCampaignIndex !== null });
     }
   }
 
@@ -243,7 +257,8 @@ class Game {
   floorCellFromHit(hit) {
     if (!hit || !this.sim) return null;
     if (hit.type === 'voxel') return hit.normal.y > 0.5 ? hit.adjacent : null;
-    if (hit.type === 'unit') return hit.batch === 'troops' && hit.unit && hit.unit.alive ? { ...hit.unit.cell } : null;
+    if (hit.type === 'unit')
+      return hit.batch === 'troops' && hit.unit && hit.unit.alive ? { ...hit.unit.cell } : null;
     if (hit.type === 'sign') {
       const s = this.sim.signById(hit.id);
       return s ? s.cell : null;
@@ -257,7 +272,8 @@ class Game {
       const u = hit.unit;
       return hit.batch === 'troops' && u && u.alive && u.team === TEAM.PLAYER ? u : null;
     }
-    if (hit.type === 'voxel') return this.sim.troopAt(hit.adjacent, TEAM.PLAYER) || this.sim.troopAt(hit.cell, TEAM.PLAYER);
+    if (hit.type === 'voxel')
+      return this.sim.troopAt(hit.adjacent, TEAM.PLAYER) || this.sim.troopAt(hit.cell, TEAM.PLAYER);
     return null;
   }
 
@@ -288,11 +304,13 @@ class Game {
     return `${role.label}${troop.role ? '' : ' (paused)'}${progress}`;
   }
 
-
   onHover(hit) {
-    if (this.mode === MODE.EDIT) { this.editor.onHover(hit); return; }
+    if (this.mode === MODE.EDIT) {
+      this.editor.onHover(hit);
+      return;
+    }
     this.hover = hit;
-     this.renderer.setSignPreview(null); // re-shown below when a sign is about to be planted
+    this.renderer.setSignPreview(null); // re-shown below when a sign is about to be planted
     const sim = this.sim;
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) {
       this.renderer.setCursor(null);
@@ -307,12 +325,16 @@ class Game {
       const worker = this.findTroopFromHit(hit);
       if (worker && (worker.role || worker.suspended)) {
         this.renderer.setCursor(worker.cell, 0xffd75a);
-        this.hud.setHint(`Troop #${worker.id}: ${this.roleSummary(worker)} — right-click or shift-click ${worker.role ? 'pauses' : 'resumes'} it`);
+        this.hud.setHint(
+          `Troop #${worker.id}: ${this.roleSummary(worker)} — right-click or shift-click ${worker.role ? 'pauses' : 'resumes'} it`
+        );
       } else if (sign) {
         this.renderer.setCursor(sign.cell, own ? 0xffd75a : 0xff6a6a);
-        this.hud.setHint(own
-          ? `${this.signSummary(sign)} — ${describeSign(sign.kind, sign.dir)}. Q / wheel rotates, right-click or shift-click picks it up`
-          : `Enemy ${this.signSummary(sign)} — steers the enemy column only`);
+        this.hud.setHint(
+          own
+            ? `${this.signSummary(sign)} — ${describeSign(sign.kind, sign.dir)}. Q / wheel rotates, right-click or shift-click picks it up`
+            : `Enemy ${this.signSummary(sign)} — steers the enemy column only`
+        );
       } else {
         this.renderer.setCursor(null);
         this.hud.setHint(DEFAULT_HINT);
@@ -328,14 +350,18 @@ class Game {
         this.hud.setHint(ok ? `Place ${label} here` : `Can't place ${label} here`);
       } else {
         this.renderer.setCursor(null);
-        this.hud.setHint(`Click the top of a floor voxel (or a troop standing on it) to drop a ${label}`);
+        this.hud.setHint(
+          `Click the top of a floor voxel (or a troop standing on it) to drop a ${label}`
+        );
       }
     } else if (this.tool.kind === 'sign') {
       const def = SIGNS[this.tool.key];
       if (sign) {
         if (own && sign.kind === this.tool.key && sign.def.directional) {
           this.renderer.setCursor(sign.cell, 0xffd75a);
-          this.hud.setHint(`Click or wheel to rotate this ${this.signSummary(sign)}; right-click or shift-click picks it up`);
+          this.hud.setHint(
+            `Click or wheel to rotate this ${this.signSummary(sign)}; right-click or shift-click picks it up`
+          );
         } else if (own) {
           this.renderer.setCursor(sign.cell, 0xff6a6a);
           this.hud.setHint(`${sign.def.label} here — right-click or shift-click to pick it up`);
@@ -346,24 +372,41 @@ class Game {
       } else if (cell) {
         const ok = sim.canPlaceSign(this.tool.key, cell);
         this.renderer.setCursor(cell, ok ? 0x7cff7c : 0xff6a6a);
-         this.renderer.setSignPreview(this.tool.key, cell, this.signDir, ok);
-        const facing = def.directional ? ` facing ${DIR_LABELS[this.signDir]} (Q / wheel rotates)` : '';
-        this.hud.setHint(ok ? `Place ${label} here${facing} — ${describeSign(this.tool.key, this.signDir)}` : `Can't place ${label} here`);
+        this.renderer.setSignPreview(this.tool.key, cell, this.signDir, ok);
+        const facing = def.directional
+          ? ` facing ${DIR_LABELS[this.signDir]} (Q / wheel rotates)`
+          : '';
+        this.hud.setHint(
+          ok
+            ? `Place ${label} here${facing} — ${describeSign(this.tool.key, this.signDir)}`
+            : `Can't place ${label} here`
+        );
       } else {
         this.renderer.setCursor(null);
-        this.hud.setHint(`Click the top of a floor voxel (or a troop standing on it) to plant a ${label}`);
+        this.hud.setHint(
+          `Click the top of a floor voxel (or a troop standing on it) to plant a ${label}`
+        );
       }
     }
   }
 
   onClick(hit, e) {
-    if (this.mode === MODE.EDIT) { this.editor.onClick(hit, e); return; }
+    if (this.mode === MODE.EDIT) {
+      this.editor.onClick(hit, e);
+      return;
+    }
     if (this.menuOpen) return;
     const sim = this.sim;
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return;
-    if (e && e.shiftKey) { if (!this.toggleRoleFromHit(hit)) this.pickUpSign(hit); return; }
+    if (e && e.shiftKey) {
+      if (!this.toggleRoleFromHit(hit)) this.pickUpSign(hit);
+      return;
+    }
     if (!this.tool) {
-       this.hud.showToast(`Select a tool first (keys ${HOTKEY_RANGE}). Right-click or shift-click a sign to pick it up.`, 2000);
+      this.hud.showToast(
+        `Select a tool first (keys ${HOTKEY_RANGE}). Right-click or shift-click a sign to pick it up.`,
+        2000
+      );
       return;
     }
     const cell = this.floorCellFromHit(hit);
@@ -374,9 +417,14 @@ class Game {
     } else if (this.tool.kind === 'sign') {
       const sign = this.signFromHit(hit);
       if (sign) {
-        if (sign.team !== TEAM.PLAYER) this.hud.showToast('That is an enemy sign — it belongs to the level.', 2000);
+        if (sign.team !== TEAM.PLAYER)
+          this.hud.showToast('That is an enemy sign — it belongs to the level.', 2000);
         else if (sign.kind === this.tool.key && sign.def.directional) sim.rotateSign(sign, 1);
-        else this.hud.showToast(`There is already a ${sign.def.label} here — right-click or shift-click to pick it up.`, 2000);
+        else
+          this.hud.showToast(
+            `There is already a ${sign.def.label} here — right-click or shift-click to pick it up.`,
+            2000
+          );
       } else if (cell) {
         placed = sim.placeSign(this.tool.key, cell, this.signDir);
         if (!placed) this.hud.showToast(`Can't plant a ${this.tool.label} there.`, 1500);
@@ -389,7 +437,10 @@ class Game {
   }
 
   onRightClick(hit) {
-    if (this.mode === MODE.EDIT) { this.editor.onRightClick(hit); return; }
+    if (this.mode === MODE.EDIT) {
+      this.editor.onRightClick(hit);
+      return;
+    }
     if (this.menuOpen) return;
     if (!this.toggleRoleFromHit(hit)) this.pickUpSign(hit);
   }
@@ -403,12 +454,12 @@ class Game {
     const troop = this.findTroopFromHit(hit);
     if (!troop || !(troop.role || troop.suspended)) return false;
     const result = sim.toggleRole(troop);
-    if (result) this.hud.showToast(`Troop #${troop.id}: ${this.roleSummary(troop)} — ${result}.`, 1500);
+    if (result)
+      this.hud.showToast(`Troop #${troop.id}: ${this.roleSummary(troop)} — ${result}.`, 1500);
     else this.hud.showToast(`Can't change troop #${troop.id}'s job right now.`, 1500);
     this.onHover(hit);
     return true;
   }
-
 
   /**
    * Mouse wheel: rotates the sign under the cursor (with no tool or a sign tool selected) or the
@@ -420,7 +471,10 @@ class Game {
     if (!sim || sim.status !== GAME_STATUS.PLAYING) return false;
     const sign = this.ownSignFromHit(hit);
     if (sign && sign.def.directional && (!this.tool || this.tool.kind === 'sign')) {
-      if (steps) { sim.rotateSign(sign, steps); this.onHover(hit); }
+      if (steps) {
+        sim.rotateSign(sign, steps);
+        this.onHover(hit);
+      }
       return true;
     }
     if (this.tool && this.tool.kind === 'sign' && SIGNS[this.tool.key].directional) {
@@ -435,8 +489,14 @@ class Game {
     const sim = this.sim;
     if (!hit || !sim || sim.status !== GAME_STATUS.PLAYING) return;
     const sign = this.signFromHit(hit);
-    if (!sign) { this.hud.showToast('No sign there to pick up.', 1500); return; }
-    if (sign.team !== TEAM.PLAYER) { this.hud.showToast('Enemy signs cannot be picked up.', 1500); return; }
+    if (!sign) {
+      this.hud.showToast('No sign there to pick up.', 1500);
+      return;
+    }
+    if (sign.team !== TEAM.PLAYER) {
+      this.hud.showToast('Enemy signs cannot be picked up.', 1500);
+      return;
+    }
     sim.pickUpSign(sign);
     this.signDir = sign.dir; // re-placing it keeps the facing unless you rotate
     this.hud.showToast(`${sign.def.label} returned to inventory.`, 1500);
@@ -454,29 +514,64 @@ class Game {
       // While the menu is up only its own shortcuts answer.
       switch (e.code) {
         case 'Escape':
-        case 'KeyM': this.toggleMenu(false); break;
-        case 'KeyR': this.toggleMenu(false); this.reset({ keepCamera: true }); break;
-        case 'KeyC': this.toggleMenu(false); this.startCampaign(); break;
-        case 'KeyE': this.toggleMenu(false); this.openEditor(); break;
-        default: break;
+        case 'KeyM':
+          this.toggleMenu(false);
+          break;
+        case 'KeyR':
+          this.toggleMenu(false);
+          this.reset({ keepCamera: true });
+          break;
+        case 'KeyC':
+          this.toggleMenu(false);
+          this.startCampaign();
+          break;
+        case 'KeyE':
+          this.toggleMenu(false);
+          this.openEditor();
+          break;
+        default:
+          break;
       }
       return;
     }
-     const tool = TOOLS.find((t) => t.hotkey && t.hotkey === e.key);
-    if (tool) { this.selectTool(this.tool && this.tool.id === tool.id ? null : tool.id); return; }
+    const tool = TOOLS.find((t) => t.hotkey && t.hotkey === e.key);
+    if (tool) {
+      this.selectTool(this.tool && this.tool.id === tool.id ? null : tool.id);
+      return;
+    }
     switch (e.code) {
-      case 'Escape': this.selectTool(null); break;
-      case 'Space': e.preventDefault(); this.togglePause(); break;
-      case 'KeyF': this.cycleSpeed(); break;
-      case 'KeyI': this.toggleIso(); break;
-      case 'KeyV': this.renderer.resetView(); break;
-      case 'KeyR': this.reset({ keepCamera: true }); break;
-      case 'KeyE': this.openEditor(); break;
-       case 'KeyM': this.toggleMenu(true); break;
-       case 'KeyC': this.startCampaign(); break;
-       case 'KeyN':
-         if (this.ended && this.sim && this.sim.status === GAME_STATUS.WON) this.playNextCampaignLevel();
-         break;
+      case 'Escape':
+        this.selectTool(null);
+        break;
+      case 'Space':
+        e.preventDefault();
+        this.togglePause();
+        break;
+      case 'KeyF':
+        this.cycleSpeed();
+        break;
+      case 'KeyI':
+        this.toggleIso();
+        break;
+      case 'KeyV':
+        this.renderer.resetView();
+        break;
+      case 'KeyR':
+        this.reset({ keepCamera: true });
+        break;
+      case 'KeyE':
+        this.openEditor();
+        break;
+      case 'KeyM':
+        this.toggleMenu(true);
+        break;
+      case 'KeyC':
+        this.startCampaign();
+        break;
+      case 'KeyN':
+        if (this.ended && this.sim && this.sim.status === GAME_STATUS.WON)
+          this.playNextCampaignLevel();
+        break;
       case 'KeyQ': {
         // Rotate the sign under the cursor when there is one, else the next sign's facing.
         const sign = this.ownSignFromHit(this.hover);
@@ -488,7 +583,8 @@ class Game {
         }
         break;
       }
-      default: break;
+      default:
+        break;
     }
   }
 
@@ -503,7 +599,10 @@ class Game {
 
   /** The menu holds the assault while it is open and restores the previous pause state on close. */
   toggleMenu(open = !this.menuOpen) {
-    if (open === this.menuOpen) { this.hud.setMenuOpen(open); return; }
+    if (open === this.menuOpen) {
+      this.hud.setMenuOpen(open);
+      return;
+    }
     this.menuOpen = open;
     if (open) {
       this.pausedBeforeMenu = this.paused;
@@ -529,7 +628,7 @@ class Game {
 const game = new Game(
   document.getElementById('app'),
   document.getElementById('hud'),
-  document.getElementById('editor'),
+  document.getElementById('editor')
 );
 game.start().catch((err) => {
   console.error(err);

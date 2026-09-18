@@ -7,40 +7,47 @@
   "spawn": { "pos": [2, 3, 6], "dir": [1, 0], "count": 25, "rate": 1.5 },
   "objective": { "type": "reach", "from": [30, 3, 4], "to": [32, 3, 7], "required": 8 },
   "budget": {
-     "crates": { "rifle": 1, "pickaxe": 1, "ladder": 1, "bridge": 1, "medic": 1, "grenade": 1, "armor": 1, "parachute": 1 },
-     "signs": { "blocker": 3, "arrow": 2, "fan": 1, "forward": 1 },
+    "crates": {
+      "rifle": 1,
+      "pickaxe": 1,
+      "ladder": 1,
+      "bridge": 1,
+      "medic": 1,
+      "grenade": 1,
+      "armor": 1,
+      "parachute": 1
+    },
+    "signs": { "blocker": 3, "arrow": 2, "fan": 1, "forward": 1 },
     "roles": { "builder": 2 }
   },
   "guards": [
-    { "type": "sentry",    "pos": [27, 3, 6],  "dir": [-1, 0] },
-    { "type": "turret",    "pos": [24, 10, 5], "dir": [-1, 0] },
-    { "type": "grenadier", "pos": [28, 3, 8],  "dir": [-1, 0] }
+    { "type": "sentry", "pos": [27, 3, 6], "dir": [-1, 0] },
+    { "type": "turret", "pos": [24, 10, 5], "dir": [-1, 0] },
+    { "type": "grenadier", "pos": [28, 3, 8], "dir": [-1, 0] }
   ],
-  "enemySpawners": [
-    { "pos": [18, 3, 1], "dir": [0, 1], "count": 4, "rate": 8 }
-  ],
+  "enemySpawners": [{ "pos": [18, 3, 1], "dir": [0, 1], "count": 4, "rate": 8 }],
   "signs": [],
   "crates": [],
   "fills": [
-    { "type": "bedrock",   "from": [0, 0, 0],   "to": [39, 0, 11] },
-    { "type": "dirt",      "from": [0, 1, 0],   "to": [39, 2, 11] },
+    { "type": "bedrock", "from": [0, 0, 0], "to": [39, 0, 11] },
+    { "type": "dirt", "from": [0, 1, 0], "to": [39, 2, 11] },
 
-    { "type": "dirt",      "from": [12, 3, 0],  "to": [13, 5, 11] },
+    { "type": "dirt", "from": [12, 3, 0], "to": [13, 5, 11] },
 
-    { "type": "spikes",    "from": [20, 2, 0],  "to": [20, 2, 2] },
-    { "type": "spikes",    "from": [20, 2, 9],  "to": [20, 2, 11] },
+    { "type": "spikes", "from": [20, 2, 0], "to": [20, 2, 2] },
+    { "type": "spikes", "from": [20, 2, 9], "to": [20, 2, 11] },
 
-    { "type": "stone",     "from": [24, 3, 2],  "to": [34, 9, 2] },
-    { "type": "stone",     "from": [24, 3, 9],  "to": [34, 9, 9] },
-    { "type": "stone",     "from": [24, 3, 2],  "to": [24, 9, 9] },
-    { "type": "stone",     "from": [34, 3, 2],  "to": [34, 9, 9] },
-    { "type": "air",       "from": [24, 3, 5],  "to": [24, 4, 6] },
+    { "type": "stone", "from": [24, 3, 2], "to": [34, 9, 2] },
+    { "type": "stone", "from": [24, 3, 9], "to": [34, 9, 9] },
+    { "type": "stone", "from": [24, 3, 2], "to": [24, 9, 9] },
+    { "type": "stone", "from": [34, 3, 2], "to": [34, 9, 9] },
+    { "type": "air", "from": [24, 3, 5], "to": [24, 4, 6] },
 
-    { "type": "stone",     "from": [24, 10, 2], "to": [24, 11, 2] },
-    { "type": "stone",     "from": [34, 10, 2], "to": [34, 11, 2] },
-    { "type": "stone",     "from": [24, 10, 9], "to": [24, 11, 9] },
-    { "type": "stone",     "from": [34, 10, 9], "to": [34, 11, 9] },
+    { "type": "stone", "from": [24, 10, 2], "to": [24, 11, 2] },
+    { "type": "stone", "from": [34, 10, 2], "to": [34, 11, 2] },
+    { "type": "stone", "from": [24, 10, 9], "to": [24, 11, 9] },
+    { "type": "stone", "from": [34, 10, 9], "to": [34, 11, 9] },
 
-    { "type": "objective", "from": [30, 2, 4],  "to": [32, 2, 7] }
+    { "type": "objective", "from": [30, 2, 4], "to": [32, 2, 7] }
   ]
 }

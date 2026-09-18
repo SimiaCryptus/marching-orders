@@ -17,31 +17,51 @@ const QUARTER = Math.PI / 2;
  *   forward  — troops crossing it sideways turn to march its way; troops already moving along
  *              its axis pass through (a one-way arrow that leaves the return trip alone).
  *   blocker  — not directional: troops refuse to step onto it and turn around.
-* A sign that sets a troop marching along a wall (or along the level bounds) also puts it into
-* wall-following mode: from then on it takes its turns from that wall instead of preferring the
-* straight line, until something — another sign, a fan's diagonal step, a fall — takes it off.
+ * A sign that sets a troop marching along a wall (or along the level bounds) also puts it into
+ * wall-following mode: from then on it takes its turns from that wall instead of preferring the
+ * straight line, until something — another sign, a fan's diagonal step, a fall — takes it off.
  * `arrows` are rendering hints for the plate in the sign's local frame: yaw in radians
  * (+ = left) and a lateral offset `ox` (+ = left).
  */
 export const SIGNS = Object.freeze({
   blocker: {
-    name: 'blocker', label: 'Blocker Sign', color: 0xe04848, directional: false, bar: true, arrows: [],
+    name: 'blocker',
+    label: 'Blocker Sign',
+    color: 0xe04848,
+    directional: false,
+    bar: true,
+    arrows: [],
     describe: 'troops that bump into it turn around',
   },
   arrow: {
-    name: 'arrow', label: 'Arrow Sign', color: 0x4ad0c0, directional: true,
+    name: 'arrow',
+    label: 'Arrow Sign',
+    color: 0x4ad0c0,
+    directional: true,
     arrows: [{ yaw: 0 }],
     describe: 'every troop that steps onto it marches the way the arrow points',
   },
   fan: {
-    name: 'fan', label: 'Fan Sign', color: 0xc47ae8, directional: true, radius: 2,
+    name: 'fan',
+    label: 'Fan Sign',
+    color: 0xc47ae8,
+    directional: true,
+    radius: 2,
     arrows: [{ yaw: 0 }, { yaw: QUARTER / 2, ox: 0.22 }, { yaw: -QUARTER / 2, ox: -0.22 }],
-    describe: 'spreads the column over three lanes marching its way; funnels troops within 2 cells onto its lane marching back (rotate 180° to swap)',
+    describe:
+      'spreads the column over three lanes marching its way; funnels troops within 2 cells onto its lane marching back (rotate 180° to swap)',
   },
   forward: {
-    name: 'forward', label: 'Forward Sign', color: 0xf0a030, directional: true,
-    arrows: [{ yaw: 0, ox: 0.16 }, { yaw: 0, ox: -0.16 }],
-    describe: 'troops crossing it sideways turn to march its way; troops already on its axis pass through',
+    name: 'forward',
+    label: 'Forward Sign',
+    color: 0xf0a030,
+    directional: true,
+    arrows: [
+      { yaw: 0, ox: 0.16 },
+      { yaw: 0, ox: -0.16 },
+    ],
+    describe:
+      'troops crossing it sideways turn to march its way; troops already on its axis pass through',
   },
 });
 
@@ -98,7 +118,8 @@ const LEGS = [0, -1, 1]; // straight, one lane left, one lane right
  */
 export function diagonalTarget(sim, c, fd, side, team = TEAM.PLAYER) {
   const world = sim.world;
-  const f = DIRS[fd], r = DIRS[turnRight(fd)];
+  const f = DIRS[fd],
+    r = DIRS[turnRight(fd)];
   const tx = c.x + f.dx + side * r.dx;
   const tz = c.z + f.dz + side * r.dz;
   if (tx < 0 || tx >= world.w || tz < 0 || tz >= world.d) return null; // the level edge is a wall
@@ -132,10 +153,12 @@ function distribute(troop, sign, fd, sim) {
  * column on the sign's lane before (or as) it passes the sign.
  */
 function funnel(troop, sign, fd, radius, sim) {
-  const f = DIRS[fd], r = DIRS[turnRight(fd)];
-  const dx = troop.cell.x - sign.x, dz = troop.cell.z - sign.z;
-  const along = dx * f.dx + dz * f.dz;   // < 0: still approaching the sign's row
-  const across = dx * r.dx + dz * r.dz;  // > 0: right of the sign's lane
+  const f = DIRS[fd],
+    r = DIRS[turnRight(fd)];
+  const dx = troop.cell.x - sign.x,
+    dz = troop.cell.z - sign.z;
+  const along = dx * f.dx + dz * f.dz; // < 0: still approaching the sign's row
+  const across = dx * r.dx + dz * r.dz; // > 0: right of the sign's lane
   if (across === 0 || Math.abs(across) > radius || along < -radius || along > -1) return false;
   if (Math.abs(troop.cell.y - sign.y) > 1) return false;
   const target = diagonalTarget(sim, troop.cell, fd, across > 0 ? -1 : 1, troop.team);
@@ -157,7 +180,8 @@ export function applySigns(troop, sim) {
     const def = SIGNS[sign.kind];
     if (!def || !def.directional) continue;
     const here = sign.x === c.x && sign.y === c.y && sign.z === c.z;
-    const sd = sign.dir, back = turnAround(sd);
+    const sd = sign.dir,
+      back = turnAround(sd);
     switch (sign.kind) {
       case 'arrow':
         // Whatever way it arrived from, a troop on the sign takes the arrow's direction.

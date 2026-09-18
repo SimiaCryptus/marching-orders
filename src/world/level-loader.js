@@ -35,22 +35,28 @@ const isVec = (v, n) => Array.isArray(v) && v.length === n && v.every(isInt);
 const isFacing = (v) => isVec(v, 2) && !(v[0] === 0 && v[1] === 0);
 
 /** Sign kinds from earlier designs (notes.md): the old turn signs are now the single Arrow sign. */
-const LEGACY_SIGN_KIND = { turnLeft: 'arrow', turnRight: 'arrow', turn: 'arrow', fanOut: 'fan', divert: 'fan' };
+const LEGACY_SIGN_KIND = {
+  turnLeft: 'arrow',
+  turnRight: 'arrow',
+  turn: 'arrow',
+  fanOut: 'fan',
+  divert: 'fan',
+};
 
 function normalizeSignBudget(raw) {
   const out = {};
   for (const [k, v] of Object.entries(raw || {})) {
-     const key = LEGACY_SIGN_KIND[k] ?? k;
+    const key = LEGACY_SIGN_KIND[k] ?? k;
     if (!SIGNS[key] || !Number.isFinite(v)) continue;
     out[key] = (out[key] ?? 0) + Math.max(0, Math.round(v));
   }
   return out;
 }
 /**
-* Roles that are handed out by a crate now (items/equipment.js). A legacy `budget.roles.<name>`
-* point becomes this many crates of the same name — the Builder used to carry 12 planks, a
-* Builder Crate carries `rules.builderBricks` (5), so one role becomes two crates.
-*/
+ * Roles that are handed out by a crate now (items/equipment.js). A legacy `budget.roles.<name>`
+ * point becomes this many crates of the same name — the Builder used to carry 12 planks, a
+ * Builder Crate carries `rules.builderBricks` (5), so one role becomes two crates.
+ */
 const ROLE_CRATES = { builder: 2 };
 /** Folds legacy role budgets into the crate budget; anything else stays a role budget. */
 function normalizeRoleBudget(raw, crates) {
@@ -64,13 +70,13 @@ function normalizeRoleBudget(raw, crates) {
   return out;
 }
 
-
 /**
  * Deep-clones a raw level object, validates the required fields and fills in defaults so the
  * rest of the game can rely on the shape. Throws an Error with a human-readable message.
  */
 export function normalizeLevel(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Level must be a JSON object');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    throw new Error('Level must be a JSON object');
   const level = JSON.parse(JSON.stringify(raw));
 
   if (!isVec(level.size, 3) || level.size.some((n) => n < 1 || n > 256)) {
@@ -86,11 +92,14 @@ export function normalizeLevel(raw) {
   sp.rate = Number.isFinite(sp.rate) && sp.rate > 0 ? sp.rate : 1.5;
 
   const o = level.objective;
-  if (!o || !isVec(o.from, 3) || !isVec(o.to, 3)) throw new Error('"objective" needs "from" and "to" cells');
+  if (!o || !isVec(o.from, 3) || !isVec(o.to, 3))
+    throw new Error('"objective" needs "from" and "to" cells');
   o.type = o.type || 'reach';
-  if (o.type !== 'reach') throw new Error(`Unsupported objective type "${o.type}" (the MVP supports "reach")`);
+  if (o.type !== 'reach')
+    throw new Error(`Unsupported objective type "${o.type}" (the MVP supports "reach")`);
   for (let i = 0; i < 3; i++) {
-    const a = Math.min(o.from[i], o.to[i]), b = Math.max(o.from[i], o.to[i]);
+    const a = Math.min(o.from[i], o.to[i]),
+      b = Math.max(o.from[i], o.to[i]);
     o.from[i] = a;
     o.to[i] = b;
   }
@@ -98,7 +107,7 @@ export function normalizeLevel(raw) {
 
   level.lethalFall = isInt(level.lethalFall) && level.lethalFall > 0 ? level.lethalFall : 4;
   level.timeLimit = Number.isFinite(level.timeLimit) && level.timeLimit >= 0 ? level.timeLimit : 0;
-   level.rules = normalizeRules(level.rules); // tunable stats (rules.js), defaults when absent
+  level.rules = normalizeRules(level.rules); // tunable stats (rules.js), defaults when absent
   const crateBudget = { ...(level.budget?.crates || {}) };
   level.budget = {
     roles: normalizeRoleBudget(level.budget?.roles, crateBudget), // may add builder crates
@@ -129,9 +138,16 @@ export function normalizeLevel(raw) {
   // Level-authored signs and crates, each tagged with the team it affects.
   level.signs = Array.isArray(level.signs)
     ? level.signs
-         .map((s) => (s && typeof s.kind === 'string' ? { ...s, kind: LEGACY_SIGN_KIND[s.kind] ?? s.kind } : s))
+        .map((s) =>
+          s && typeof s.kind === 'string' ? { ...s, kind: LEGACY_SIGN_KIND[s.kind] ?? s.kind } : s
+        )
         .filter((s) => s && isVec(s.pos, 3) && typeof s.kind === 'string' && SIGNS[s.kind])
-        .map((s) => ({ kind: s.kind, pos: s.pos, dir: isFacing(s.dir) ? s.dir : [...sp.dir], team: normalizeTeam(s.team) }))
+        .map((s) => ({
+          kind: s.kind,
+          pos: s.pos,
+          dir: isFacing(s.dir) ? s.dir : [...sp.dir],
+          team: normalizeTeam(s.team),
+        }))
     : [];
   level.crates = Array.isArray(level.crates)
     ? level.crates
@@ -139,7 +155,7 @@ export function normalizeLevel(raw) {
         .map((c) => {
           const out = { kind: c.kind, pos: c.pos, team: normalizeTeam(c.team) };
           if (isInt(c.capacity) && c.capacity > 0) out.capacity = c.capacity;
-           if (typeof c.exclusive === 'boolean') out.exclusive = c.exclusive; // overrides rules.<kind>Exclusive
+          if (typeof c.exclusive === 'boolean') out.exclusive = c.exclusive; // overrides rules.<kind>Exclusive
           return out;
         })
     : [];
@@ -147,7 +163,8 @@ export function normalizeLevel(raw) {
   if (level.voxels !== undefined && !Array.isArray(level.voxels?.rle)) {
     throw new Error('"voxels.rle" must be an array of [type, count] pairs');
   }
-  if (level.fills !== undefined && !Array.isArray(level.fills)) throw new Error('"fills" must be an array');
+  if (level.fills !== undefined && !Array.isArray(level.fills))
+    throw new Error('"fills" must be an array');
   return level;
 }
 
@@ -174,7 +191,8 @@ export function buildWorld(level) {
 
   for (const f of level.fills || []) {
     const type = VOXEL_BY_NAME[f.type];
-    if (type === undefined) throw new Error(`Unknown voxel type "${f.type}" in level "${level.name}"`);
+    if (type === undefined)
+      throw new Error(`Unknown voxel type "${f.type}" in level "${level.name}"`);
     world.fill(f.from, f.to, type);
   }
   return world;
@@ -227,8 +245,17 @@ export function newBlankLevel(w = 32, h = 12, d = 12) {
       required: 5,
     },
     budget: {
-       crates: { rifle: 1, pickaxe: 1, ladder: 1, bridge: 1, medic: 1, grenade: 1, armor: 1, parachute: 1 },
-       signs: { blocker: 2, arrow: 2, fan: 1, forward: 1 },
+      crates: {
+        rifle: 1,
+        pickaxe: 1,
+        ladder: 1,
+        bridge: 1,
+        medic: 1,
+        grenade: 1,
+        armor: 1,
+        parachute: 1,
+      },
+      signs: { blocker: 2, arrow: 2, fan: 1, forward: 1 },
       roles: { builder: 2 },
     },
     guards: [],
@@ -238,7 +265,11 @@ export function newBlankLevel(w = 32, h = 12, d = 12) {
     fills: [
       { type: 'bedrock', from: [0, 0, 0], to: [w - 1, 0, d - 1] },
       { type: 'dirt', from: [0, 1, 0], to: [w - 1, Math.min(2, h - 1), d - 1] },
-      { type: 'objective', from: [ox, 2, Math.max(0, mid - 1)], to: [Math.min(w - 1, ox + 2), 2, Math.min(d - 1, mid + 1)] },
+      {
+        type: 'objective',
+        from: [ox, 2, Math.max(0, mid - 1)],
+        to: [Math.min(w - 1, ox + 2), 2, Math.min(d - 1, mid + 1)],
+      },
     ],
   });
 }

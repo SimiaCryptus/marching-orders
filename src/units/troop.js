@@ -1,4 +1,13 @@
-import { DIRS, nextStep, turnAround, turnLeft, turnRight, supported, wallBeside, stepTarget } from './pathing.js';
+import {
+  DIRS,
+  nextStep,
+  turnAround,
+  turnLeft,
+  turnRight,
+  supported,
+  wallBeside,
+  stepTarget,
+} from './pathing.js';
 import { VOXEL, isLethal } from '../world/voxel.js';
 import { applySigns } from '../items/sign.js';
 import { TEAM } from './team.js';
@@ -61,7 +70,7 @@ export class Troop {
 
     // equipment (items/equipment.js)
     this.equipment = null; // kind in the exclusive slot
-    this.kits = [];        // every kind carried, in pickup order
+    this.kits = []; // every kind carried, in pickup order
     this.canDig = false;
     this.digUses = 0;
     this.digTimer = 0;
@@ -171,8 +180,12 @@ export class Troop {
   }
 
   advance(dt, sim) {
-    const tx = this.target.x + 0.5, ty = this.target.y, tz = this.target.z + 0.5;
-    const dx = tx - this.pos.x, dy = ty - this.pos.y, dz = tz - this.pos.z;
+    const tx = this.target.x + 0.5,
+      ty = this.target.y,
+      tz = this.target.z + 0.5;
+    const dx = tx - this.pos.x,
+      dy = ty - this.pos.y,
+      dz = tz - this.pos.z;
     const dist = Math.hypot(dx, dy, dz);
     const step = this.moveSpeed * dt;
     if (step >= dist) {
@@ -195,7 +208,10 @@ export class Troop {
     const world = sim.world;
     const { x, y, z } = this.cell;
     const below = world.get(x, y - 1, z);
-    if (isLethal(below)) { this.die(sim, 'hazard'); return; }
+    if (isLethal(below)) {
+      this.die(sim, 'hazard');
+      return;
+    }
     if (!supported(world, x, y, z)) return; // still airborne, next tick keeps falling
 
     if (wasFalling) {
@@ -203,7 +219,10 @@ export class Troop {
         if (this.parachutes > 0) {
           // The canopy takes the impact instead of the troop.
           sim.events.push({ type: 'parachute', pos: { ...this.pos } });
-          if (--this.parachutes <= 0) { this.parachutes = 0; this.removeKit('parachute'); }
+          if (--this.parachutes <= 0) {
+            this.parachutes = 0;
+            this.removeKit('parachute');
+          }
         } else {
           this.die(sim, 'fall');
           return;
@@ -222,7 +241,7 @@ export class Troop {
       return;
     }
     // Out in the open with nothing left to hug: stop following.
-     if (this.wallSide && !this.keepsWall(world)) this.wallSide = 0;
+    if (this.wallSide && !this.keepsWall(world)) this.wallSide = 0;
     sim.tryPickupCrate(this);
     // Signs steer the column; a troop busy with a role ignores them.
     if (!this.role) applySigns(this, sim);
@@ -325,27 +344,27 @@ export class Troop {
     for (let d = 0; d < 4; d++) if (wallBeside(world, c.x, c.y, c.z, d)) return true;
     return false;
   }
-   /**
-    * Is the wall this troop follows still there — beside it, or just around the exterior angle it
-    * has stepped past? A convex corner leaves the followed face diagonally behind for exactly one
-    * cell; the old "any wall beside" test dropped the mode right there, so columns missed every
-    * outside corner and marched off into the open instead of going around the block.
-    */
-   keepsWall(world) {
-     const c = this.cell;
-     if (wallBeside(world, c.x, c.y, c.z, this.towardWall)) return true;
-     return this.wallAroundCorner(world);
-   }
-   /**
-    * The exterior angle: the face is gone from the troop's side, but the cell one step toward it
-    * still has that face behind it — turning the corner keeps the hand on the very same wall.
-    * (After the turn the followed side points back along the old facing, for either hand.)
-    */
-   wallAroundCorner(world) {
-     const c = this.cell;
-     const t = DIRS[this.towardWall];
-     return wallBeside(world, c.x + t.dx, c.y, c.z + t.dz, turnAround(this.dir));
-   }
+  /**
+   * Is the wall this troop follows still there — beside it, or just around the exterior angle it
+   * has stepped past? A convex corner leaves the followed face diagonally behind for exactly one
+   * cell; the old "any wall beside" test dropped the mode right there, so columns missed every
+   * outside corner and marched off into the open instead of going around the block.
+   */
+  keepsWall(world) {
+    const c = this.cell;
+    if (wallBeside(world, c.x, c.y, c.z, this.towardWall)) return true;
+    return this.wallAroundCorner(world);
+  }
+  /**
+   * The exterior angle: the face is gone from the troop's side, but the cell one step toward it
+   * still has that face behind it — turning the corner keeps the hand on the very same wall.
+   * (After the turn the followed side points back along the old facing, for either hand.)
+   */
+  wallAroundCorner(world) {
+    const c = this.cell;
+    const t = DIRS[this.towardWall];
+    return wallBeside(world, c.x + t.dx, c.y, c.z + t.dz, turnAround(this.dir));
+  }
   /**
    * Called after a sign steered this troop: start following the wall it now marches along, or
    * drop the one it was following when the new course has no wall beside it.
@@ -356,13 +375,13 @@ export class Troop {
     else if (wallBeside(world, c.x, c.y, c.z, turnLeft(this.dir))) this.wallSide = -1;
     else this.wallSide = 0;
   }
-   /** The followed wall fell away at an exterior angle: turn into it and go around the corner. */
+  /** The followed wall fell away at an exterior angle: turn into it and go around the corner. */
   hugWall(sim) {
     const c = this.cell;
     const toward = this.towardWall;
     if (wallBeside(sim.world, c.x, c.y, c.z, toward)) return; // still hugging it
-     // Only an exterior angle is worth turning for; a wall that truly ended is dropped on arrival.
-     if (!this.wallAroundCorner(sim.world)) return;
+    // Only an exterior angle is worth turning for; a wall that truly ended is dropped on arrival.
+    if (!this.wallAroundCorner(sim.world)) return;
     if (this.canStep(sim, toward)) this.dir = toward;
   }
   /** Blocked ahead while following a wall: turn away from it (the obstacle becomes the new face). */
@@ -371,7 +390,6 @@ export class Troop {
     return this.canStep(sim, away) ? away : turnAround(this.dir);
   }
 
-
   // ---- combat -------------------------------------------------------------------
 
   /** Returns true when the troop is busy fighting this tick. */
@@ -379,7 +397,8 @@ export class Troop {
     if (this.tryGrenade(sim)) return true;
     const target = sim.findHostileInRange(this);
     if (!target) {
-      if (this.state === TROOP_STATE.FIGHTING || this.state === TROOP_STATE.SHOOTING) this.state = TROOP_STATE.WALKING;
+      if (this.state === TROOP_STATE.FIGHTING || this.state === TROOP_STATE.SHOOTING)
+        this.state = TROOP_STATE.WALKING;
       return false;
     }
     const ranged = this.range > 1;
@@ -407,7 +426,10 @@ export class Troop {
     this.grenadeTimer = this.grenadeCooldown;
     this.state = TROOP_STATE.SHOOTING;
     sim.throwGrenade(this, target.cell, this.grenadeAttack, this.grenadeSplash, GRENADE_MUZZLE);
-    if (--this.grenades <= 0) { this.grenades = 0; this.removeKit('grenade'); }
+    if (--this.grenades <= 0) {
+      this.grenades = 0;
+      this.removeKit('grenade');
+    }
     return true;
   }
 
@@ -419,8 +441,14 @@ export class Troop {
     if (!wounded) return;
     this.healTimer = this.healCooldown;
     wounded.hp = Math.min(wounded.maxHp, wounded.hp + this.healAmount);
-    sim.events.push({ type: 'heal', pos: { x: wounded.pos.x, y: wounded.pos.y + 0.6, z: wounded.pos.z } });
-    if (--this.healCharges <= 0) { this.healCharges = 0; this.removeKit('medic'); }
+    sim.events.push({
+      type: 'heal',
+      pos: { x: wounded.pos.x, y: wounded.pos.y + 0.6, z: wounded.pos.z },
+    });
+    if (--this.healCharges <= 0) {
+      this.healCharges = 0;
+      this.removeKit('medic');
+    }
   }
 
   takeDamage(amount, sim) {
@@ -430,7 +458,10 @@ export class Troop {
       const absorbed = Math.min(this.armorPool, dmg * this.armorMitigation);
       this.armorPool -= absorbed;
       dmg -= absorbed;
-      if (this.armorPool <= 1e-6) { this.armorPool = 0; this.removeKit('armor'); }
+      if (this.armorPool <= 1e-6) {
+        this.armorPool = 0;
+        this.removeKit('armor');
+      }
     }
     this.hp -= dmg;
     this.flash = 1;
@@ -488,7 +519,6 @@ export class Troop {
     if (s.role.resume) s.role.resume(this, sim);
     return true;
   }
-
 
   clearRole(sim) {
     const role = this.role;

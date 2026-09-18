@@ -23,19 +23,62 @@ import { mulberry32, plural } from './util.js';
  * prefix of a fixed, seeded ordering, so changing a count never reshuffles the maze.
  */
 
-const FLOOR_Y = 3;    // the air cell troops walk in (bedrock at 0, dirt at 1..2)
-const WALL_TOP = 4;   // walls are two voxels high above the lane: no stepping over
+const FLOOR_Y = 3; // the air cell troops walk in (bedrock at 0, dirt at 1..2)
+const WALL_TOP = 4; // walls are two voxels high above the lane: no stepping over
 const HEIGHT = 8;
-const NEIGHBOURS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+const NEIGHBOURS = [
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+  [0, -1],
+];
 
 export const PARAMS = Object.freeze([
   { key: 'seed', label: 'Seed', type: 'int', min: 0, max: 999999, default: 1, layout: true },
-  { key: 'cells', label: 'Maze size (cells per side)', type: 'int', min: 4, max: 14, default: 8, layout: true },
-  { key: 'corridor', label: 'Corridor width', type: 'int', min: 1, max: 3, default: 2, layout: true },
-  { key: 'difficulty', label: 'Difficulty (0–10)', type: 'int', min: 0, max: 10, default: 3, layout: true },
-  { key: 'mud', label: 'Mud on the route (%)', type: 'int', min: 0, max: 100, default: 25, layout: true,
-    help: 'Share of the route\'s cells floored with mud (troops slow down on it)' },
-  { key: 'name', label: 'Name', type: 'string', default: '', help: 'Blank: "Maze #<seed> (difficulty n)"' },
+  {
+    key: 'cells',
+    label: 'Maze size (cells per side)',
+    type: 'int',
+    min: 4,
+    max: 14,
+    default: 8,
+    layout: true,
+  },
+  {
+    key: 'corridor',
+    label: 'Corridor width',
+    type: 'int',
+    min: 1,
+    max: 3,
+    default: 2,
+    layout: true,
+  },
+  {
+    key: 'difficulty',
+    label: 'Difficulty (0–10)',
+    type: 'int',
+    min: 0,
+    max: 10,
+    default: 3,
+    layout: true,
+  },
+  {
+    key: 'mud',
+    label: 'Mud on the route (%)',
+    type: 'int',
+    min: 0,
+    max: 100,
+    default: 25,
+    layout: true,
+    help: "Share of the route's cells floored with mud (troops slow down on it)",
+  },
+  {
+    key: 'name',
+    label: 'Name',
+    type: 'string',
+    default: '',
+    help: 'Blank: "Maze #<seed> (difficulty n)"',
+  },
   { key: 'troops', label: 'Player troops', type: 'int', min: 5, max: 300, auto: true },
   { key: 'traps', label: 'Trapped dead ends', type: 'int', min: 0, max: 60, auto: true },
   { key: 'patrols', label: 'Enemy patrols', type: 'int', min: 0, max: 20, auto: true },
@@ -72,14 +115,19 @@ function carveMaze(rng, n) {
   visited[0] = 1;
   while (stack.length) {
     const cur = stack[stack.length - 1];
-    const i = cur % n, j = Math.floor(cur / n);
+    const i = cur % n,
+      j = Math.floor(cur / n);
     const options = [];
     for (const [di, dj] of NEIGHBOURS) {
-      const ni = i + di, nj = j + dj;
+      const ni = i + di,
+        nj = j + dj;
       if (ni < 0 || ni >= n || nj < 0 || nj >= n || visited[idx(ni, nj)]) continue;
       options.push(idx(ni, nj));
     }
-    if (!options.length) { stack.pop(); continue; }
+    if (!options.length) {
+      stack.pop();
+      continue;
+    }
     const next = options[Math.floor(rng() * options.length)];
     visited[next] = 1;
     links[cur].push(next);
@@ -111,14 +159,24 @@ function bfs(links, from) {
 /** Build a level from resolved parameters. Returns an author-style level (the framework normalises it). */
 export function build(p) {
   // Only the layout parameters seed the RNG: tweaking a count never reshuffles the maze.
-  const rng = mulberry32(p.seed * 1000003 + p.cells * 1009 + p.corridor * 101 + p.difficulty * 7 + p.mud);
-  const n = p.cells, cw = p.corridor, S = cw + 1;
-  const w = n * S + 1, h = HEIGHT, d = w;
+  const rng = mulberry32(
+    p.seed * 1000003 + p.cells * 1009 + p.corridor * 101 + p.difficulty * 7 + p.mud
+  );
+  const n = p.cells,
+    cw = p.corridor,
+    S = cw + 1;
+  const w = n * S + 1,
+    h = HEIGHT,
+    d = w;
   const half = Math.floor((cw - 1) / 2);
   const idx = (i, j) => j * n + i;
   const at = (k) => [k % n, Math.floor(k / n)];
-  const lo = (i) => i * S + 1, hi = (i) => i * S + cw; // corridor voxels of maze cell i along one axis
-  const centre = (k) => { const [i, j] = at(k); return [lo(i) + half, FLOOR_Y, lo(j) + half]; };
+  const lo = (i) => i * S + 1,
+    hi = (i) => i * S + cw; // corridor voxels of maze cell i along one axis
+  const centre = (k) => {
+    const [i, j] = at(k);
+    return [lo(i) + half, FLOOR_Y, lo(j) + half];
+  };
   const key = (pos) => pos.join(',');
 
   // ---- the maze and its solution -----------------------------------------------------------
@@ -137,7 +195,8 @@ export function build(p) {
     return [bi - ai, bj - aj];
   });
   let turns = 0;
-  for (let t = 1; t < steps.length; t++) if (steps[t][0] !== steps[t - 1][0] || steps[t][1] !== steps[t - 1][1]) turns++;
+  for (let t = 1; t < steps.length; t++)
+    if (steps[t][0] !== steps[t - 1][0] || steps[t][1] !== steps[t - 1][1]) turns++;
   const onPath = new Uint8Array(n * n);
   for (const k of path) onPath[k] = 1;
 
@@ -154,19 +213,38 @@ export function build(p) {
     for (const m of links[k]) {
       if (m < k) continue; // each passage once
       const [mi] = at(m);
-      if (mi === i + 1) fills.push({ type: 'air', from: [hi(i) + 1, FLOOR_Y, lo(j)], to: [hi(i) + 1, WALL_TOP, hi(j)] });
-      else fills.push({ type: 'air', from: [lo(i), FLOOR_Y, hi(j) + 1], to: [hi(i), WALL_TOP, hi(j) + 1] });
+      if (mi === i + 1)
+        fills.push({
+          type: 'air',
+          from: [hi(i) + 1, FLOOR_Y, lo(j)],
+          to: [hi(i) + 1, WALL_TOP, hi(j)],
+        });
+      else
+        fills.push({
+          type: 'air',
+          from: [lo(i), FLOOR_Y, hi(j) + 1],
+          to: [hi(i), WALL_TOP, hi(j) + 1],
+        });
     }
   }
 
   // ---- traps in dead ends off the route ----------------------------------------------------
-  const deadEnds = shuffle(rng, [...links.keys()].filter((k) => links[k].length === 1 && k !== start && k !== end && !onPath[k]));
+  const deadEnds = shuffle(
+    rng,
+    [...links.keys()].filter((k) => links[k].length === 1 && k !== start && k !== end && !onPath[k])
+  );
   const kinds = deadEnds.map(() => (p.difficulty >= 5 && rng() < 0.4 ? 'pit' : 'spikes'));
   const trapped = deadEnds.slice(0, p.traps).map((k, t) => ({ k, kind: kinds[t] }));
   for (const { k, kind } of trapped) {
     const [i, j] = at(k);
-    if (kind === 'pit') fills.push({ type: 'air', from: [lo(i), 1, lo(j)], to: [hi(i), FLOOR_Y - 1, hi(j)] });
-    else fills.push({ type: 'spikes', from: [lo(i), FLOOR_Y - 1, lo(j)], to: [hi(i), FLOOR_Y - 1, hi(j)] });
+    if (kind === 'pit')
+      fills.push({ type: 'air', from: [lo(i), 1, lo(j)], to: [hi(i), FLOOR_Y - 1, hi(j)] });
+    else
+      fills.push({
+        type: 'spikes',
+        from: [lo(i), FLOOR_Y - 1, lo(j)],
+        to: [hi(i), FLOOR_Y - 1, hi(j)],
+      });
   }
   const nPits = trapped.filter((t) => t.kind === 'pit').length;
 
@@ -181,12 +259,17 @@ export function build(p) {
 
   // ---- the vault -----------------------------------------------------------------------------
   const [ei, ej] = at(end);
-  fills.push({ type: 'objective', from: [lo(ei), FLOOR_Y - 1, lo(ej)], to: [hi(ei), FLOOR_Y - 1, hi(ej)] });
+  fills.push({
+    type: 'objective',
+    from: [lo(ei), FLOOR_Y - 1, lo(ej)],
+    to: [hi(ei), FLOOR_Y - 1, hi(ej)],
+  });
 
   // ---- enemy patrols programmed into straight stretches of the route -------------------------
   const occupied = new Set([key(centre(start))]);
   const patrolled = new Uint8Array(n * n);
-  const enemySpawners = [], signs = [];
+  const enemySpawners = [],
+    signs = [];
   const segments = []; // maximal runs of the route in one direction: path[a] .. path[b]
   for (let a = 0, t = 1; t <= steps.length; t++) {
     if (t === steps.length || steps[t][0] !== steps[a][0] || steps[t][1] !== steps[a][1]) {
@@ -200,9 +283,11 @@ export function build(p) {
     // Off the pod, off the vault approach, and never sharing a corner with the previous patrol.
     if (seg.a <= lastB || seg.a < 1 || seg.b > L - 3) continue;
     const [bi, bj] = at(path[seg.b]);
-    const si = bi + seg.dir[0], sj = bj + seg.dir[1];
+    const si = bi + seg.dir[0],
+      sj = bj + seg.dir[1];
     // A branch running straight on past the corner would carry the column away instead of turning it.
-    if (si >= 0 && si < n && sj >= 0 && sj < n && links[path[seg.b]].includes(idx(si, sj))) continue;
+    if (si >= 0 && si < n && sj >= 0 && sj < n && links[path[seg.b]].includes(idx(si, sj)))
+      continue;
     const c0 = centre(path[seg.a]);
     const pod = [c0[0] + seg.dir[0], FLOOR_Y, c0[2] + seg.dir[1]];
     signs.push({ kind: 'arrow', pos: c0, dir: [...seg.dir], team: 'enemy' });
@@ -225,7 +310,8 @@ export function build(p) {
     const [i, j] = at(k);
     const c = centre(k);
     for (const [di, dj] of NEIGHBOURS) {
-      const ni = i + di, nj = j + dj;
+      const ni = i + di,
+        nj = j + dj;
       if (ni >= 0 && ni < n && nj >= 0 && nj < n && links[k].includes(idx(ni, nj))) continue;
       const x = di === 0 ? c[0] : di > 0 ? hi(i) + 1 : lo(i) - 1;
       const z = dj === 0 ? c[2] : dj > 0 ? hi(j) + 1 : lo(j) - 1;
@@ -254,19 +340,22 @@ export function build(p) {
   const crates = [];
   if (hostiles > 0 && L > 2) {
     const c = centre(path[1]); // a rifle crate on the first stretch: the column arms itself on the way
-    if (!occupied.has(key(c))) { occupied.add(key(c)); crates.push({ kind: 'rifle', pos: c, team: 'player', capacity: 5 }); }
+    if (!occupied.has(key(c))) {
+      occupied.add(key(c));
+      crates.push({ kind: 'rifle', pos: c, team: 'player', capacity: 5 });
+    }
   }
   const required = Math.max(3, Math.round(p.troops * (0.3 + 0.03 * p.difficulty)));
   const budget = {
     crates: {
       rifle: hostiles > 0 ? 1 + Math.floor(hostiles / 3) : 0,
       medic: hostiles >= 3 ? 1 : 0,
-      pickaxe: wallType === 'dirt' || nPits > 0 ? 1 : 0,   // shortcuts through soft walls / out of a pit
+      pickaxe: wallType === 'dirt' || nPits > 0 ? 1 : 0, // shortcuts through soft walls / out of a pit
       ladder: nPits > 0 ? 1 : 0,
       armor: p.difficulty >= 6 ? 1 : 0,
     },
     signs: {
-      arrow: turns + 2,                    // one per corner of the route, plus slack
+      arrow: turns + 2, // one per corner of the route, plus slack
       blocker: 2 + enemySpawners.length,
       forward: 1 + Math.floor(turns / 3),
       fan: 1,
@@ -282,11 +371,14 @@ export function build(p) {
 
   const parts = [];
   if (trapped.length) {
-    parts.push(`${plural(trapped.length, 'trapped dead end')} (${plural(trapped.length - nPits, 'spike bed')}` +
-      (nPits ? `, ${plural(nPits, 'pit')})` : ')'));
+    parts.push(
+      `${plural(trapped.length, 'trapped dead end')} (${plural(trapped.length - nPits, 'spike bed')}` +
+        (nPits ? `, ${plural(nPits, 'pit')})` : ')')
+    );
   }
   if (mudCells) parts.push(`mud on ${plural(mudCells, 'cell')} of the route`);
-  if (enemySpawners.length) parts.push(`${plural(enemySpawners.length, 'enemy patrol')} of ${p.enemyTroops}`);
+  if (enemySpawners.length)
+    parts.push(`${plural(enemySpawners.length, 'enemy patrol')} of ${p.enemyTroops}`);
   parts.push(plural(guards.length, 'guard'));
   const description =
     `Steer the column through a ${n}×${n} maze of ${wallType} walls — the route takes ${plural(turns, 'turn')}. ` +
@@ -300,8 +392,18 @@ export function build(p) {
     lethalFall: 4,
     timeLimit,
     rules,
-    spawn: { pos: centre(start), dir: steps[0] ? [...steps[0]] : [1, 0], count: p.troops, rate: 1.5 },
-    objective: { type: 'reach', from: [lo(ei), FLOOR_Y, lo(ej)], to: [hi(ei), FLOOR_Y, hi(ej)], required },
+    spawn: {
+      pos: centre(start),
+      dir: steps[0] ? [...steps[0]] : [1, 0],
+      count: p.troops,
+      rate: 1.5,
+    },
+    objective: {
+      type: 'reach',
+      from: [lo(ei), FLOOR_Y, lo(ej)],
+      to: [hi(ei), FLOOR_Y, hi(ej)],
+      required,
+    },
     budget,
     guards,
     enemySpawners,

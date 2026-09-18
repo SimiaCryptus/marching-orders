@@ -60,30 +60,43 @@ export class World {
       }
     }
   }
-   /** Copy of this world with new dimensions; overlapping voxels are preserved. */
-   resized(w, h, d) {
-     const next = new World(w, h, d);
-     const mw = Math.min(w, this.w), mh = Math.min(h, this.h), md = Math.min(d, this.d);
-     for (let y = 0; y < mh; y++) {
-       for (let z = 0; z < md; z++) {
-         for (let x = 0; x < mw; x++) {
-           next.data[next.index(x, y, z)] = this.data[this.index(x, y, z)];
-         }
-       }
-     }
-     return next;
-   }
+  /** Copy of this world with new dimensions; overlapping voxels are preserved. */
+  resized(w, h, d) {
+    const next = new World(w, h, d);
+    const mw = Math.min(w, this.w),
+      mh = Math.min(h, this.h),
+      md = Math.min(d, this.d);
+    for (let y = 0; y < mh; y++) {
+      for (let z = 0; z < md; z++) {
+        for (let x = 0; x < mw; x++) {
+          next.data[next.index(x, y, z)] = this.data[this.index(x, y, z)];
+        }
+      }
+    }
+    return next;
+  }
 
   markDirty(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE), cy = Math.floor(y / CHUNK_SIZE), cz = Math.floor(z / CHUNK_SIZE);
+    const cx = Math.floor(x / CHUNK_SIZE),
+      cy = Math.floor(y / CHUNK_SIZE),
+      cz = Math.floor(z / CHUNK_SIZE);
     const add = (a, b, c) => {
-      if (a >= 0 && a < this.chunks[0] && b >= 0 && b < this.chunks[1] && c >= 0 && c < this.chunks[2]) {
+      if (
+        a >= 0 &&
+        a < this.chunks[0] &&
+        b >= 0 &&
+        b < this.chunks[1] &&
+        c >= 0 &&
+        c < this.chunks[2]
+      ) {
         this.dirty.add(chunkKey(a, b, c));
       }
     };
     add(cx, cy, cz);
     // Neighbouring chunks share culled faces across the border.
-    const lx = x % CHUNK_SIZE, ly = y % CHUNK_SIZE, lz = z % CHUNK_SIZE;
+    const lx = x % CHUNK_SIZE,
+      ly = y % CHUNK_SIZE,
+      lz = z % CHUNK_SIZE;
     if (lx === 0) add(cx - 1, cy, cz);
     if (lx === CHUNK_SIZE - 1) add(cx + 1, cy, cz);
     if (ly === 0) add(cx, cy - 1, cz);

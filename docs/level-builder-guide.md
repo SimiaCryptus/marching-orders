@@ -2,7 +2,7 @@
 
 How to author a level for this game — by hand, from the editor, or from an automated
 (agentic) generator. It documents the JSON model, every validation rule, the simulation rules
-a level must respect to be *solvable*, and a verification procedure you should run before
+a level must respect to be _solvable_, and a verification procedure you should run before
 emitting a level.
 
 The machine-readable schema lives in [`src/world/level.d.ts`](../src/world/level.d.ts).
@@ -22,36 +22,36 @@ JSON text ──parseLevel/loadLevel──▶ normalizeLevel(raw) ──▶ Leve
                                                    simulation: pod → troops → objective
 ```
 
-* `normalizeLevel` **deep-clones** the input, throws on structural errors, and fills in every
+- `normalizeLevel` **deep-clones** the input, throws on structural errors, and fills in every
   default. Anything it does not recognise is dropped silently (bad guards, unknown sign kinds,
-  crates with unknown equipment…), so *silence is not success* — verify your output.
-* `buildWorld` paints the voxel grid: first `voxels.rle`, then each entry of `fills` in order.
-* `exportLevel(level, world)` converts a world back to `voxels.rle` and deletes `fills`.
-* `encodeLevelHash` / `decodeLevelHash` base64url a whole level into the URL hash for sharing.
+  crates with unknown equipment…), so _silence is not success_ — verify your output.
+- `buildWorld` paints the voxel grid: first `voxels.rle`, then each entry of `fills` in order.
+- `exportLevel(level, world)` converts a world back to `voxels.rle` and deletes `fills`.
+- `encodeLevelHash` / `decodeLevelHash` base64url a whole level into the URL hash for sharing.
 
 ---
 
 ## 2. Coordinate system and conventions
 
-* `size = [w, h, d]` → x ∈ [0, w-1] (width/east), y ∈ [0, h-1] (height/up), z ∈ [0, d-1]
+- `size = [w, h, d]` → x ∈ [0, w-1] (width/east), y ∈ [0, h-1] (height/up), z ∈ [0, d-1]
   (depth/south). Each between 1 and 256; volume `w*h*d` should stay under ~200 000 cells for
   comfortable rendering.
-* **Units occupy air cells.** A troop standing "on the floor" is in the *air* cell whose
+- **Units occupy air cells.** A troop standing "on the floor" is in the _air_ cell whose
   neighbour below is solid. If the floor's top voxel is `y = 2`, troops walk at `y = 3`.
-* Directions are `[dx, dz]` pairs, axis aligned and non-zero:
+- Directions are `[dx, dz]` pairs, axis aligned and non-zero:
   `[1,0]` east (+x), `[0,1]` south (+z), `[-1,0]` west (−x), `[0,-1]` north (−z).
   Internally these become `DIRS` indices 0..3 (clockwise from +x).
-* **The level edge is an unbreakable wall.** Units never step, climb, ladder or fan out of
+- **The level edge is an unbreakable wall.** Units never step, climb, ladder or fan out of
   bounds; they turn around instead. You do not need a wall of voxels around the map.
-* Recommended house layout (used by the parametric builder):
+- Recommended house layout (used by the parametric builder):
 
-  | y | content |
-  |---|---------|
-  | 0 | `bedrock` floor |
-  | 1–2 | `dirt` sub-floor |
-  | 3 | **`FLOOR_Y`** — the air lane troops walk in |
-  | 3..9 | walls, obstacles, keep |
-  | 10..11 | parapets, turret posts |
+  | y      | content                                     |
+  | ------ | ------------------------------------------- |
+  | 0      | `bedrock` floor                             |
+  | 1–2    | `dirt` sub-floor                            |
+  | 3      | **`FLOOR_Y`** — the air lane troops walk in |
+  | 3..9   | walls, obstacles, keep                      |
+  | 10..11 | parapets, turret posts                      |
 
 ---
 
@@ -59,31 +59,31 @@ JSON text ──parseLevel/loadLevel──▶ normalizeLevel(raw) ──▶ Leve
 
 Required fields are marked **R**. Everything else has a default.
 
-| Field | Type | Default / rule |
-|---|---|---|
-| `name` | string | `"Untitled Level"` if missing/blank |
-| `description` | string | `""` — shown in the briefing; say what the obstacles are and what the tools are for |
-| **R** `size` | `[w,h,d]` ints | each 1..256, else throws |
-| **R** `spawn.pos` | `[x,y,z]` ints | throws if absent/malformed |
-| `spawn.dir` | facing | `[1,0]`; a zero vector is replaced by the default |
-| `spawn.count` | int > 0 | `20` |
-| `spawn.rate` | number > 0 | `1.5` — **seconds between drops** (20 troops at 1.5 = 30 s of column) |
-| **R** `objective.from` / `.to` | `[x,y,z]` ints | throws if absent; corners are sorted per axis, so any two opposite corners work |
-| `objective.type` | `'reach'` | `'reach'`; anything else throws |
-| `objective.required` | int > 0 | `1`; must be ≤ `spawn.count` to be winnable |
-| `lethalFall` | int > 0 | `4` — a fall of **exactly** this many cells survives, one more kills |
-| `timeLimit` | number ≥ 0 | `0` = unlimited (seconds) |
-| `rules` | object | see §8; each key clamped to its range, missing keys use the default |
-| `budget.crates` | `{kind: n}` | `{}` |
-| `budget.signs` | `{kind: n}` | `{}`; legacy kinds folded, non-finite values and unknown kinds dropped, counts rounded and clamped to ≥ 0 |
-| `budget.roles` | `{builder: n}` | `{}` |
-| `guards[]` | array | non-array → `[]`; entries without a valid `pos` are dropped |
-| `enemySpawners[]` | array | as above; `dir` defaults to the reverse of `spawn.dir` |
-| `signs[]` | array | entries need a valid `pos` **and** a known `kind`, else dropped |
-| `crates[]` | array | entries need a valid `pos` **and** a known equipment `kind`, else dropped |
-| `voxels` | `{rle:[[id,n],…]}` | if present, `voxels.rle` must be an array or it throws |
-| `fills` | `Fill[]` | if present must be an array or it throws |
-| `generator`, `campaign` | metadata | passed through untouched |
+| Field                          | Type               | Default / rule                                                                                            |
+| ------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `name`                         | string             | `"Untitled Level"` if missing/blank                                                                       |
+| `description`                  | string             | `""` — shown in the briefing; say what the obstacles are and what the tools are for                       |
+| **R** `size`                   | `[w,h,d]` ints     | each 1..256, else throws                                                                                  |
+| **R** `spawn.pos`              | `[x,y,z]` ints     | throws if absent/malformed                                                                                |
+| `spawn.dir`                    | facing             | `[1,0]`; a zero vector is replaced by the default                                                         |
+| `spawn.count`                  | int > 0            | `20`                                                                                                      |
+| `spawn.rate`                   | number > 0         | `1.5` — **seconds between drops** (20 troops at 1.5 = 30 s of column)                                     |
+| **R** `objective.from` / `.to` | `[x,y,z]` ints     | throws if absent; corners are sorted per axis, so any two opposite corners work                           |
+| `objective.type`               | `'reach'`          | `'reach'`; anything else throws                                                                           |
+| `objective.required`           | int > 0            | `1`; must be ≤ `spawn.count` to be winnable                                                               |
+| `lethalFall`                   | int > 0            | `4` — a fall of **exactly** this many cells survives, one more kills                                      |
+| `timeLimit`                    | number ≥ 0         | `0` = unlimited (seconds)                                                                                 |
+| `rules`                        | object             | see §8; each key clamped to its range, missing keys use the default                                       |
+| `budget.crates`                | `{kind: n}`        | `{}`                                                                                                      |
+| `budget.signs`                 | `{kind: n}`        | `{}`; legacy kinds folded, non-finite values and unknown kinds dropped, counts rounded and clamped to ≥ 0 |
+| `budget.roles`                 | `{builder: n}`     | `{}`                                                                                                      |
+| `guards[]`                     | array              | non-array → `[]`; entries without a valid `pos` are dropped                                               |
+| `enemySpawners[]`              | array              | as above; `dir` defaults to the reverse of `spawn.dir`                                                    |
+| `signs[]`                      | array              | entries need a valid `pos` **and** a known `kind`, else dropped                                           |
+| `crates[]`                     | array              | entries need a valid `pos` **and** a known equipment `kind`, else dropped                                 |
+| `voxels`                       | `{rle:[[id,n],…]}` | if present, `voxels.rle` must be an array or it throws                                                    |
+| `fills`                        | `Fill[]`           | if present must be an array or it throws                                                                  |
+| `generator`, `campaign`        | metadata           | passed through untouched                                                                                  |
 
 ### Errors thrown by `normalizeLevel` (exact strings)
 
@@ -115,9 +115,9 @@ Unknown voxel type "<name>" in level "<level name>"
 { "type": "dirt", "from": [0, 1, 0], "to": [31, 2, 11] }
 ```
 
-* Inclusive boxes, corners in any order, painted **in array order** after the RLE blob, so a
+- Inclusive boxes, corners in any order, painted **in array order** after the RLE blob, so a
   later `"air"` fill carves openings (gates, tunnels, trenches) out of earlier solids.
-* Readable and diffable — a generator should emit `fills`, never RLE.
+- Readable and diffable — a generator should emit `fills`, never RLE.
 
 ### `voxels.rle` (editor export only)
 
@@ -127,17 +127,17 @@ throw. Runs that overflow the array are clipped; a short list leaves the tail as
 
 ### Voxel palette
 
-| name | solid | diggable | climbable | lethal | use |
-|---|---|---|---|---|---|
-| `air` | – | – | – | – | empty space, carving |
-| `bedrock` | ✔ | ✘ | – | – | map floor, permanent structure |
-| `dirt` | ✔ | ✔ | – | – | the soft obstacle material (pickaxe target) |
-| `stone` | ✔ | ✘ | – | – | keeps, pillars, anything that must force a detour |
-| `plank` | ✔ | (soft) | – | – | placed by the Builder role |
-| `ladder` | – | – | ✔ | – | climbable, counts as support |
-| `spikes` | ✔ | – | – | ✔ | kills a troop that arrives in the cell above it |
-| `mud` | ✔ | ✔ | – | – | slow floor: a step onto a mud-floored cell takes `speed × rules.mudSpeed` (default ½) |
-| `objective` | ✔ | – | – | – | vault-floor marker under the objective volume |
+| name        | solid | diggable | climbable | lethal | use                                                                                   |
+| ----------- | ----- | -------- | --------- | ------ | ------------------------------------------------------------------------------------- |
+| `air`       | –     | –        | –         | –      | empty space, carving                                                                  |
+| `bedrock`   | ✔     | ✘        | –         | –      | map floor, permanent structure                                                        |
+| `dirt`      | ✔     | ✔        | –         | –      | the soft obstacle material (pickaxe target)                                           |
+| `stone`     | ✔     | ✘        | –         | –      | keeps, pillars, anything that must force a detour                                     |
+| `plank`     | ✔     | (soft)   | –         | –      | placed by the Builder role                                                            |
+| `ladder`    | –     | –        | ✔         | –      | climbable, counts as support                                                          |
+| `spikes`    | ✔     | –        | –         | ✔      | kills a troop that arrives in the cell above it                                       |
+| `mud`       | ✔     | ✔        | –         | –      | slow floor: a step onto a mud-floored cell takes `speed × rules.mudSpeed` (default ½) |
+| `objective` | ✔     | –        | –         | –      | vault-floor marker under the objective volume                                         |
 
 The canonical list and the predicates (`isSolid`, `isDiggable`, `isClimbable`, `isLethal`) are
 in `src/world/voxel.js` — check there before using a name not in this table.
@@ -149,16 +149,16 @@ in `src/world/voxel.js` — check there before using a name not in this table.
 Everything a troop does when it reaches a cell centre is decided by `nextStep()`
 (`src/units/pathing.js`). A level is only solvable if its geometry is compatible with these:
 
-1. **Support.** A unit in air cell `(x,y,z)` is supported by a solid at `(x,y-1,z)` *or* by a
+1. **Support.** A unit in air cell `(x,y,z)` is supported by a solid at `(x,y-1,z)` _or_ by a
    ladder in its own cell. Otherwise it **falls** one cell per tick (7 cells/s).
 2. **Out of bounds ahead → turn around.**
 3. **Solid ahead at head-of-foot level `y`:**
-   * `(tx,y+1,tz)` free (and `y+1 < h`) → **stepUp** (1-voxel ledges are climbed for free).
-   * else ladder at `(x,y+1,z)` → **climb**.
-   * else the troop has ladder charges and `(x,y+1,z)` is air → **ladder** (0.7 s per segment;
+   - `(tx,y+1,tz)` free (and `y+1 < h`) → **stepUp** (1-voxel ledges are climbed for free).
+   - else ladder at `(x,y+1,z)` → **climb**.
+   - else the troop has ladder charges and `(x,y+1,z)` is air → **ladder** (0.7 s per segment;
      also fills its own cell so the column can follow it up).
-   * else it has a pickaxe and the block ahead is diggable → **dig** (0.6 s per voxel).
-   * else → **turn around**.
+   - else it has a pickaxe and the block ahead is diggable → **dig** (0.6 s per voxel).
+   - else → **turn around**.
 4. **Air ahead:** walk if `(tx,y-1,tz)` is solid; **stepDown** if `(tx,y-2,tz)` is solid;
    otherwise, if the troop carries a bridge kit and `(tx,y-1,tz)` is air, it lays a plank there
    (**bridge**, 0.5 s per plank) and walks on; otherwise it walks off the ledge and gravity takes over.
@@ -173,18 +173,18 @@ Everything a troop does when it reaches a cell centre is decided by `nextStep()`
 
 ### Consequences for authoring
 
-* **A 1-high step is not an obstacle.** Walls must be ≥ 2 voxels above the walking lane.
-* A 2-high `dirt` wall = "dig, ladder, or build over". A 3-high wall defeats a single ladder
+- **A 1-high step is not an obstacle.** Walls must be ≥ 2 voxels above the walking lane.
+- A 2-high `dirt` wall = "dig, ladder, or build over". A 3-high wall defeats a single ladder
   kit (`rules.ladderCharges` = 3 gets you up 3 cells only if the wall is exactly reachable —
   test it) and usually demands a Builder or a pickaxe.
-* A `stone` wall can only be gone *around* or *over* — never through.
-* Trenches: carving `air` from `y=1` to `FLOOR_Y-1` gives a 2-deep pit; troops drop in
+- A `stone` wall can only be gone _around_ or _over_ — never through.
+- Trenches: carving `air` from `y=1` to `FLOOR_Y-1` gives a 2-deep pit; troops drop in
   (survivable at the default `lethalFall`) and face a 2-high wall on the far side. A bridge
   crate lets the column plank straight across instead (one plank per gap cell).
-* Never leave a drop that exceeds `lethalFall` on the only viable route unless you intend it
+- Never leave a drop that exceeds `lethalFall` on the only viable route unless you intend it
   as a hazard.
-* The default corridor must eventually reach the objective volume; if the only path is through
-  diggable material, you *must* grant a pickaxe (budget or crate).
+- The default corridor must eventually reach the objective volume; if the only path is through
+  diggable material, you _must_ grant a pickaxe (budget or crate).
 
 ---
 
@@ -197,20 +197,20 @@ file along `spawn.dir`; everything downstream is about steering and equipping th
 
 ### 6.2 Objective
 
-* The scoring volume is the inclusive box `objective.from..objective.to`, given in **air cells
-  troops stand in**. Paint an `objective` voxel slab one cell *below* it so the player can see
+- The scoring volume is the inclusive box `objective.from..objective.to`, given in **air cells
+  troops stand in**. Paint an `objective` voxel slab one cell _below_ it so the player can see
   the vault (the marker block is cosmetic).
-* `required` troops must arrive; each arrival removes the troop from play (`SAVED`).
-* Rule of thumb: `required` ≈ 30–60 % of `spawn.count`. The parametric builder uses
+- `required` troops must arrive; each arrival removes the troop from play (`SAVED`).
+- Rule of thumb: `required` ≈ 30–60 % of `spawn.count`. The parametric builder uses
   `round(troops * (0.3 + 0.03 * difficulty))`, floor 3.
 
 ### 6.3 Guards (`GUARD_TYPES`, all stationary, always on the enemy team)
 
-| type | hp | melee | reach | ranged | range | min range | cooldown | notes |
-|---|---|---|---|---|---|---|---|---|
-| `sentry` | 30 | 4 | 1 | – | – | – | 1.2 s | gate/corridor blocker; also physically blocks the cell |
-| `turret` | 40 | – | 0 | 2 | 6 | – | 0.5 s | hitscan bullet, needs line of sight; park on walls/parapets |
-| `grenadier` | 25 | 2 | 1 | 6 | 7 | 2 | 3.0 s ranged | arcing grenade, 1.5 splash; deadly against bunched columns |
+| type        | hp  | melee | reach | ranged | range | min range | cooldown     | notes                                                       |
+| ----------- | --- | ----- | ----- | ------ | ----- | --------- | ------------ | ----------------------------------------------------------- |
+| `sentry`    | 30  | 4     | 1     | –      | –     | –         | 1.2 s        | gate/corridor blocker; also physically blocks the cell      |
+| `turret`    | 40  | –     | 0     | 2      | 6     | –         | 0.5 s        | hitscan bullet, needs line of sight; park on walls/parapets |
+| `grenadier` | 25  | 2     | 1     | 6      | 7     | 2         | 3.0 s ranged | arcing grenade, 1.5 splash; deadly against bunched columns  |
 
 Scaled at construction by `rules.guardHpScale`, `guardDamageScale`, `guardRangeScale`.
 Place guards in **supported air cells** — they never fall, but a floating sentry looks broken.
@@ -231,33 +231,33 @@ Alternate sides down the corridor so the player must both fight and time the cro
 ### 6.5 Signs (`src/items/sign.js`)
 
 Signs sit in walkable air cells, belong to a team, and only steer that team. Effects are
-evaluated when a troop *finishes* a step; the first matching sign of the troop's team wins.
+evaluated when a troop _finishes_ a step; the first matching sign of the troop's team wins.
 
-| kind | directional | effect |
-|---|---|---|
-| `blocker` | no | troops refuse to enter the cell and turn around |
-| `arrow` | yes | any troop that steps onto it marches the sign's direction, whatever it arrived from |
-| `fan` | yes | troops crossing it in the sign's direction are round-robined over three lanes (straight / diag-left / diag-right); troops marching *back* toward it within `radius = 2` cells are funnelled onto its lane |
-| `forward` | yes | troops crossing it *sideways* turn to the sign's direction; troops already on its axis pass through (a one-way gate that leaves the return trip alone) |
+| kind      | directional | effect                                                                                                                                                                                                    |
+| --------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `blocker` | no          | troops refuse to enter the cell and turn around                                                                                                                                                           |
+| `arrow`   | yes         | any troop that steps onto it marches the sign's direction, whatever it arrived from                                                                                                                       |
+| `fan`     | yes         | troops crossing it in the sign's direction are round-robined over three lanes (straight / diag-left / diag-right); troops marching _back_ toward it within `radius = 2` cells are funnelled onto its lane |
+| `forward` | yes         | troops crossing it _sideways_ turn to the sign's direction; troops already on its axis pass through (a one-way gate that leaves the return trip alone)                                                    |
 
 Legacy input kinds are rewritten by the loader: `turnLeft`/`turnRight`/`turn` → `arrow`,
 `fanOut`/`divert` → `fan`. Emit the modern names.
 
-Pre-placed `signs[]` are level furniture (great for scripting the *enemy* column). Signs the
+Pre-placed `signs[]` are level furniture (great for scripting the _enemy_ column). Signs the
 player may place come from `budget.signs`.
 
 ### 6.6 Crates and equipment (`src/items/equipment.js`)
 
-| kind | effect on the troop that picks it up |
-|---|---|
-| `rifle` | `range = rules.rifleRange` (8), `attack = rules.rifleAttack` (3), cooldown 1.0 s — ranged troops out-duel sentries and shoot turrets off walls |
-| `pickaxe` | `canDig = true`, `digUses = rules.pickaxeCharges` (10 voxels); consumed, then the slot frees up |
-| `ladder` | `ladders = rules.ladderCharges` (3 segments) for climbing walls ≥ 2 high |
-| `bridge` | `bridges = rules.bridgeCharges` (4 planks): when a gap (a drop of two or more) is ahead the troop lays a permanent plank at floor level and walks on — trenches and pits become crossings |
-| `medic` | `rules.medicCharges` (6) heals of `rules.medicHeal` (4) HP, applied automatically to the nearest wounded troop of its team within `rules.medicRange` (3) cells, every `rules.medicCooldown` (1.5 s) |
-| `grenade` | `rules.grenadeCharges` (3) grenades lobbed at hostiles between `rules.grenadeMinRange` (2) and `rules.grenadeRange` (6) cells with line of sight: `rules.grenadeAttack` (6) damage over `rules.grenadeSplash` (1.5) cells, every `rules.grenadeCooldown` (3 s); they hurt enemy troops *and* guards |
-| `armor` | absorbs `rules.armorMitigation` (50 %) of every hit until `rules.armorPool` (20 — twice a troop's HP) damage has been soaked up, then it is discarded |
-| `parachute` | survives `rules.parachuteCharges` (3) falls beyond `lethalFall`, and floats down at half speed |
+| kind        | effect on the troop that picks it up                                                                                                                                                                                                                                                                |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rifle`     | `range = rules.rifleRange` (8), `attack = rules.rifleAttack` (3), cooldown 1.0 s — ranged troops out-duel sentries and shoot turrets off walls                                                                                                                                                      |
+| `pickaxe`   | `canDig = true`, `digUses = rules.pickaxeCharges` (10 voxels); consumed, then the slot frees up                                                                                                                                                                                                     |
+| `ladder`    | `ladders = rules.ladderCharges` (3 segments) for climbing walls ≥ 2 high                                                                                                                                                                                                                            |
+| `bridge`    | `bridges = rules.bridgeCharges` (4 planks): when a gap (a drop of two or more) is ahead the troop lays a permanent plank at floor level and walks on — trenches and pits become crossings                                                                                                           |
+| `medic`     | `rules.medicCharges` (6) heals of `rules.medicHeal` (4) HP, applied automatically to the nearest wounded troop of its team within `rules.medicRange` (3) cells, every `rules.medicCooldown` (1.5 s)                                                                                                 |
+| `grenade`   | `rules.grenadeCharges` (3) grenades lobbed at hostiles between `rules.grenadeMinRange` (2) and `rules.grenadeRange` (6) cells with line of sight: `rules.grenadeAttack` (6) damage over `rules.grenadeSplash` (1.5) cells, every `rules.grenadeCooldown` (3 s); they hurt enemy troops _and_ guards |
+| `armor`     | absorbs `rules.armorMitigation` (50 %) of every hit until `rules.armorPool` (20 — twice a troop's HP) damage has been soaked up, then it is discarded                                                                                                                                               |
+| `parachute` | survives `rules.parachuteCharges` (3) falls beyond `lethalFall`, and floats down at half speed                                                                                                                                                                                                      |
 
 A crate serves the first `capacity` troops of its team (`capacity` defaults to
 `rules.crateCapacity`, 5). A troop has **one exclusive equipment slot plus any number of
@@ -266,7 +266,7 @@ stackable kits**: whether a kind takes the slot is the level rule `rules.<kind>E
 it with `"exclusive": false` / `true`. Effects combine — an armoured rifleman with a parachute is
 a legitimate build — and a consumable kit frees its slot when it runs out. A troop never takes a
 kind it already carries. Place crates on the walking lane so the column crosses them without
-steering, or *off* the lane to make the player route a detachment there with signs.
+steering, or _off_ the lane to make the player route a detachment there with signs.
 
 ### 6.7 Roles (`budget.roles`)
 
@@ -327,7 +327,7 @@ kit: rifle range/damage, pickaxe, ladder and bridge charges, the medic's charges
 the grenade band/damage/splash/cooldown, armor pool and mitigation, parachute charges, and
 which kits are exclusive. Enemy columns have their own `enemyTroopHp`, `enemyTroopSpeed` and
 `enemyTroopScale` (body size), and `mudSpeed` sets how much mud slows a step. Use `rules` to
-change *difficulty* without changing *terrain*:
+change _difficulty_ without changing _terrain_:
 bumping `enemyTroopHp` and `guardHpScale` with difficulty is exactly what the parametric
 builder does (`enemyTroopHp = 10 + difficulty`, `guardHpScale = 1 + 0.05 * difficulty`).
 
@@ -338,15 +338,15 @@ builder does (`enemyTroopHp = 10 + difficulty`, `guardHpScale = 1 + 0.05 * diffi
 All snippets assume the house layout (floor top at `y = 2`, lane at `FLOOR_Y = 3`) and a
 segment origin `x`.
 
-| Obstacle | Fills | Teaches |
-|---|---|---|
-| **Dirt wall** (2 thick, 2 high) | `{dirt, [x,3,0], [x+1,4,d-1]}` | dig / ladder / build |
-| **Tall wall** (3 high) | `{dirt, [x,3,0], [x+1,5,d-1]}` | one ladder kit is not enough |
-| **Trench** (2 deep) | `{air, [x,1,0], [x+1,2,d-1]}` | falling is fine, climbing out is not |
-| **Mud flat** | `{mud, [x+1,2,0], [x+4,2,d-1]}` | the column crawls: time patrols and turret fire |
-| **Spike field** | `{spikes, [x,2,0], [x,2,d-1]}` then `{dirt, [x,2,gz], [x,2,gz+gapW-1]}` | steering: the safe gap is *never* on the pod's lane |
-| **Turret pillar** | `{stone, [x,3,pz], [x,6,pz]}` + guard `turret @ [x,7,pz]` | rifles or a detour |
-| **Keep** | 4 stone walls `y=3..9` + an `air` gate 2 wide/2 high + parapet corners | funnels the column into a killzone |
+| Obstacle                        | Fills                                                                   | Teaches                                             |
+| ------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
+| **Dirt wall** (2 thick, 2 high) | `{dirt, [x,3,0], [x+1,4,d-1]}`                                          | dig / ladder / build                                |
+| **Tall wall** (3 high)          | `{dirt, [x,3,0], [x+1,5,d-1]}`                                          | one ladder kit is not enough                        |
+| **Trench** (2 deep)             | `{air, [x,1,0], [x+1,2,d-1]}`                                           | falling is fine, climbing out is not                |
+| **Mud flat**                    | `{mud, [x+1,2,0], [x+4,2,d-1]}`                                         | the column crawls: time patrols and turret fire     |
+| **Spike field**                 | `{spikes, [x,2,0], [x,2,d-1]}` then `{dirt, [x,2,gz], [x,2,gz+gapW-1]}` | steering: the safe gap is _never_ on the pod's lane |
+| **Turret pillar**               | `{stone, [x,3,pz], [x,6,pz]}` + guard `turret @ [x,7,pz]`               | rifles or a detour                                  |
+| **Keep**                        | 4 stone walls `y=3..9` + an `air` gate 2 wide/2 high + parapet corners  | funnels the column into a killzone                  |
 
 Spike gap placement rule: pick `gz` in `1 .. d-1-gapW` such that the gap does **not** contain
 the spawn lane `mid`, otherwise the obstacle is free. `gapW = 2` normally, `1` at difficulty ≥ 8.
@@ -370,15 +370,15 @@ Garrison posts, filled in order so a small garrison is just the gate:
 
 ## 10. Difficulty ramp
 
-| difficulty | unlocks | typical shape |
-|---|---|---|
-| 0 | dirt walls | one wall, no hostiles, generous budget |
-| 1–2 | spike fields, trenches | steering matters; 1 guard at the gate |
-| 3–4 | tall walls | ladder + builder economy |
-| 4+ | enemy patrols | blockers and rifles become mandatory |
-| 5+ | turret pillars | line-of-sight play |
-| 7+ | rifle crates for the enemy | enemy columns win firefights |
-| 8+ | narrow spike gaps, `timeLimit` | `240 + 45 * segments` seconds |
+| difficulty | unlocks                        | typical shape                          |
+| ---------- | ------------------------------ | -------------------------------------- |
+| 0          | dirt walls                     | one wall, no hostiles, generous budget |
+| 1–2        | spike fields, trenches         | steering matters; 1 guard at the gate  |
+| 3–4        | tall walls                     | ladder + builder economy               |
+| 4+         | enemy patrols                  | blockers and rifles become mandatory   |
+| 5+         | turret pillars                 | line-of-sight play                     |
+| 7+         | rifle crates for the enemy     | enemy columns win firefights           |
+| 8+         | narrow spike gaps, `timeLimit` | `240 + 45 * segments` seconds          |
 
 ---
 
@@ -406,12 +406,12 @@ Garrison posts, filled in order so a small garrison is just the gate:
     reach them.
 11. `description` names the obstacles, the hostiles and the win condition.
 12. Run the level tool: `node scripts/level-tool.mjs levels/my-level.json`. It enforces
-     `level.d.ts` strictly (unknown properties, wrong types, non-axis-aligned facings and unknown
-     kinds are errors, not silent drops), performs checks 1–9 above (placement, support, shared
-     cells, standable objective, winnable count, reachability with and without the granted
-     tools) and writes isometric and top-down thumbnails to `thumbnails/`. `--strict` makes
-     warnings fatal, `--campaign` covers the generated progression, `--json` gives a
-     machine-readable report for agents.
+    `level.d.ts` strictly (unknown properties, wrong types, non-axis-aligned facings and unknown
+    kinds are errors, not silent drops), performs checks 1–9 above (placement, support, shared
+    cells, standable objective, winnable count, reachability with and without the granted
+    tools) and writes isometric and top-down thumbnails to `thumbnails/`. `--strict` makes
+    warnings fatal, `--campaign` covers the generated progression, `--json` gives a
+    machine-readable report for agents.
 
 ### Reachability BFS (movement-graph approximation)
 
@@ -467,46 +467,42 @@ stone keep with a gated vault.
     { "type": "sentry", "pos": [23, 3, 6], "dir": [-1, 0] },
     { "type": "turret", "pos": [22, 10, 4], "dir": [-1, 0] }
   ],
-  "enemySpawners": [
-    { "pos": [14, 3, 0], "dir": [0, 1], "count": 6, "rate": 6 }
-  ],
+  "enemySpawners": [{ "pos": [14, 3, 0], "dir": [0, 1], "count": 6, "rate": 6 }],
   "signs": [],
-  "crates": [
-    { "kind": "pickaxe", "pos": [8, 3, 6], "team": "player", "capacity": 4 }
-  ],
+  "crates": [{ "kind": "pickaxe", "pos": [8, 3, 6], "team": "player", "capacity": 4 }],
   "fills": [
-    { "type": "bedrock",  "from": [0, 0, 0],  "to": [27, 0, 11] },
-    { "type": "dirt",     "from": [0, 1, 0],  "to": [27, 2, 11] },
+    { "type": "bedrock", "from": [0, 0, 0], "to": [27, 0, 11] },
+    { "type": "dirt", "from": [0, 1, 0], "to": [27, 2, 11] },
 
-    { "type": "dirt",     "from": [10, 3, 0], "to": [11, 4, 11] },
+    { "type": "dirt", "from": [10, 3, 0], "to": [11, 4, 11] },
 
-    { "type": "spikes",   "from": [16, 2, 0], "to": [16, 2, 11] },
-    { "type": "dirt",     "from": [16, 2, 8], "to": [16, 2, 9] },
+    { "type": "spikes", "from": [16, 2, 0], "to": [16, 2, 11] },
+    { "type": "dirt", "from": [16, 2, 8], "to": [16, 2, 9] },
 
-    { "type": "stone",    "from": [22, 3, 3], "to": [26, 9, 3] },
-    { "type": "stone",    "from": [22, 3, 9], "to": [26, 9, 9] },
-    { "type": "stone",    "from": [22, 3, 3], "to": [22, 9, 9] },
-    { "type": "stone",    "from": [26, 3, 3], "to": [26, 9, 9] },
-    { "type": "air",      "from": [22, 3, 5], "to": [22, 4, 6] },
-    { "type": "stone",    "from": [22, 10, 3], "to": [22, 11, 3] },
-    { "type": "stone",    "from": [22, 10, 9], "to": [22, 11, 9] },
+    { "type": "stone", "from": [22, 3, 3], "to": [26, 9, 3] },
+    { "type": "stone", "from": [22, 3, 9], "to": [26, 9, 9] },
+    { "type": "stone", "from": [22, 3, 3], "to": [22, 9, 9] },
+    { "type": "stone", "from": [26, 3, 3], "to": [26, 9, 9] },
+    { "type": "air", "from": [22, 3, 5], "to": [22, 4, 6] },
+    { "type": "stone", "from": [22, 10, 3], "to": [22, 11, 3] },
+    { "type": "stone", "from": [22, 10, 9], "to": [22, 11, 9] },
 
-    { "type": "objective","from": [24, 2, 5], "to": [25, 2, 6] }
+    { "type": "objective", "from": [24, 2, 5], "to": [25, 2, 6] }
   ]
 }
 ```
 
 Why it works:
 
-* The wall at `x = 10..11` is 2 high above the lane → turn-around unless the column digs
+- The wall at `x = 10..11` is 2 high above the lane → turn-around unless the column digs
   (pickaxe crate at `x = 8`, on the lane), ladders, or a builder stairs over it.
-* The spike row at `x = 16` has its only safe gap at `z = 8..9`, three lanes off the spawn
+- The spike row at `x = 16` has its only safe gap at `z = 8..9`, three lanes off the spawn
   lane `z = 6` → the player must plant an `arrow`/`forward` pair to route the column and a
   second pair to bring it back to the gate lane.
-* The keep is `stone` (undiggable) with a single 2×2 gate at `z = 5..6`; the sentry stands
+- The keep is `stone` (undiggable) with a single 2×2 gate at `z = 5..6`; the sentry stands
   behind it and the turret watches the approach from the parapet → the rifle crate is the
   intended answer.
-* The enemy pod at `x = 14` crosses the lane between the wall and the spikes → `blocker` signs
+- The enemy pod at `x = 14` crosses the lane between the wall and the spikes → `blocker` signs
   or a firefight.
 
 ---
@@ -521,20 +517,20 @@ import { buildParametricLevel, normalizeParams, resolveParams } from './world/le
 const level = buildParametricLevel({ seed: 42, difficulty: 5, segments: 7, depth: 18 });
 ```
 
-* Layout parameters (`seed`, `difficulty`, `segments`, `depth`) seed the RNG; count parameters
+- Layout parameters (`seed`, `difficulty`, `segments`, `depth`) seed the RNG; count parameters
   (`troops`, `patrols`, `enemyTroops`, `guards`, `enemyCrates`) may be `null` = auto and are
   then derived by `autoParams`. Tweaking a count never reshuffles the terrain.
-* Every parameter is clamped by `GENERATOR_LIMITS`; generation is deterministic.
-* The chosen parameters are stored back on `level.generator` so the designer UI can show and
+- Every parameter is clamped by `GENERATOR_LIMITS`; generation is deterministic.
+- The chosen parameters are stored back on `level.generator` so the designer UI can show and
   re-tweak them. Keep that field when you post-process a generated level.
-* `buildCampaignLevel(i)` / `campaignParams(i)` produce the fixed 12-level progression and tag
+- `buildCampaignLevel(i)` / `campaignParams(i)` produce the fixed 12-level progression and tag
   the level with `campaign: { index, length }` so the game can offer the next one after a win.
-* Other registered generators (`listGenerators()`): `arena` (open yard) and `maze` (a perfect
+- Other registered generators (`listGenerators()`): `arena` (open yard) and `maze` (a perfect
   maze with trapped dead ends, mud on the route and enemy patrols programmed into straight
   stretches with enemy arrow signs). `buildLevel('maze', { seed, cells, corridor, difficulty, mud })`
   — see [`generators.md`](generators.md).
 
-When you write a *new* generator, mirror these invariants:
+When you write a _new_ generator, mirror these invariants:
 
 1. Derive the budget from the obstacles and hostiles you actually placed.
 2. Guarantee at least one steering puzzle once the difficulty allows it (the builder forces a

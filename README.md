@@ -1,6 +1,6 @@
 # Marching Orders
 
-*A siege you don't fight — you steer.*
+_A siege you don't fight — you steer._
 
 ## What is this?
 
@@ -11,7 +11,7 @@ the environment around them — planting signs, dropping equipment crates,
 digging through walls, assigning special jobs to individuals — and watch the
 consequences ripple through the whole marching mass.
 
-If you've ever played *Lemmings*, the idea will feel familiar: a stream of
+If you've ever played _Lemmings_, the idea will feel familiar: a stream of
 simple-minded creatures pours into the level and does exactly one thing
 (march forward, turn at walls, fall off ledges) until you intervene. Your job
 is to turn that mindless stampede into a coordinated assault, using a small
@@ -33,29 +33,29 @@ the clock does.
   bump into. Left alone, this behavior alone often isn't enough to win.
 - **Crates.** Equipment left on the ground that the first troops to walk over
 - **Signs.** Small planted markers that redirect the flow of the column.
-   An **arrow** sign sends every troop that steps on it the way it points; a
-   **fan** sign spreads the column over three lanes (and funnels it back onto
-   one lane when approached from the other side); a **forward** sign
-   straightens out troops that cross it sideways; a **blocker** turns them
-   back. Every sign is a single rotatable placement (Q, the mouse wheel or the
-   rotate button), and while you aim it a ghost of the sign with a ground
-   arrow — or a funnel, for the fan — shows exactly which way the troops will
-   go. This is your main lever for "programming" the crowd's path without
-   controlling anyone individually.
+  An **arrow** sign sends every troop that steps on it the way it points; a
+  **fan** sign spreads the column over three lanes (and funnels it back onto
+  one lane when approached from the other side); a **forward** sign
+  straightens out troops that cross it sideways; a **blocker** turns them
+  back. Every sign is a single rotatable placement (Q, the mouse wheel or the
+  rotate button), and while you aim it a ghost of the sign with a ground
+  arrow — or a funnel, for the fan — shows exactly which way the troops will
+  go. This is your main lever for "programming" the crowd's path without
+  controlling anyone individually.
 - **Enemy columns.** Levels can also field enemy drop pods whose troops march
-   just like yours — following their own signs and crates — and fight your
-   column wherever the two meet.
+  just like yours — following their own signs and crates — and fight your
+  column wherever the two meet.
   it will automatically pick up — rifles, pickaxes, ladders. Equipping troops
   this way permanently changes what they can do (dig through walls, climb
-   vertical faces, fight at range). A **bridge** kit lays planks over trenches
-   and pits instead of dropping in. Support kits round the toolbox out: a
-   **medic** kit heals wounded comrades in range automatically, **grenades**
-   are lobbed at anything hostile in a band ahead, **armor** soaks up half of
-   every hit until it is spent, and a **parachute** turns a fatal drop into a
-   soft landing. Most kits take a troop's single equipment slot, but armor and
-   parachutes stack on top of whatever it already carries — and every number
-   behind them (charges, ranges, mitigation, which kits stack) is a per-level
-   rule.
+  vertical faces, fight at range). A **bridge** kit lays planks over trenches
+  and pits instead of dropping in. Support kits round the toolbox out: a
+  **medic** kit heals wounded comrades in range automatically, **grenades**
+  are lobbed at anything hostile in a band ahead, **armor** soaks up half of
+  every hit until it is spent, and a **parachute** turns a fatal drop into a
+  soft landing. Most kits take a troop's single equipment slot, but armor and
+  parachutes stack on top of whatever it already carries — and every number
+  behind them (charges, ranges, mitigation, which kits stack) is a per-level
+  rule.
 - **Roles.** A handful of troops can be pulled aside and given a special job —
   such as becoming a builder who constructs stairways, changing how the whole
 - **Guards.** The tower isn't empty. Sentries, turrets, and grenadiers defend
@@ -74,7 +74,7 @@ difficulty (0–10), how many obstacle segments the approach should have and
 how wide the corridor is — and, if you like, how many troops you get, how
 many enemy pods cross the yard and how big their columns are, how many
 guards hold the keep and how many rifle crates the enemy finds (anything
-left on *auto* follows the difficulty) — press *Generate*, and a complete
+left on _auto_ follows the difficulty) — press _Generate_, and a complete
 level appears — walls to dig or ladder over, trenches, spike fields that
 force you to steer the column, enemy patrols, turret pillars and a
 garrisoned stone keep with the vault — with a toolkit budget sized to what
@@ -97,11 +97,10 @@ every entity stands somewhere sensible and that the vault is reachable with the
 tools the level hands out, and prerenders isometric and top-down PNG thumbnails
 of every level (and of the campaign with `--campaign`).
 
-
 ## Where this idea comes from
 
 The design draws directly on the classic "indirect control" puzzle genre
-popularized by *Lemmings* in the early 1990s, crossed with the terrain-driven
+popularized by _Lemmings_ in the early 1990s, crossed with the terrain-driven
 problem solving of tower-defense and siege games. The twist here is doing it
 in a fully 3D, editable voxel world rather than a fixed 2D side-view — so
 walls can be dug through, ladders built, and the battlefield reshaped in ways
@@ -113,8 +112,8 @@ no accounts, playable directly in a browser.
 ## Why it's interesting
 
 - **Puzzles about crowds, not individuals.** Instead of "move this one
-  character to that spot," the challenge is "shape the rules so that *this
-  whole group* ends up in the right place." It rewards thinking in terms of
+  character to that spot," the challenge is "shape the rules so that _this
+  whole group_ ends up in the right place." It rewards thinking in terms of
   flow, chokepoints, and cascading consequences rather than direct
   manipulation — a different kind of problem-solving than most action or
   strategy games ask for.
@@ -132,7 +131,7 @@ no accounts, playable directly in a browser.
 
 ## Who might enjoy it
 
-- Fans of *Lemmings*, tower-defense games, or other "indirect control" puzzle
+- Fans of _Lemmings_, tower-defense games, or other "indirect control" puzzle
   genres who want to see the idea reimagined in 3D.
 - People who enjoy level editors and homemade puzzle design as much as
   playing the puzzles themselves.

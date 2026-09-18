@@ -2,16 +2,16 @@ import { VOXEL } from '../../world/voxel.js';
 import { turnAround } from '../pathing.js';
 
 const BUILD_TIME = 0.5; // seconds per plank
-const BRICKS = 5;       // fallback when no rules are available (see rules.builderBricks)
+const BRICKS = 5; // fallback when no rules are available (see rules.builderBricks)
 
 /**
  * Builds a diagonal staircase forward and upward, one plank at a time, then steps onto it.
  * Stops when it runs out of planks, when the stair meets existing terrain (walks on), or
  * when something blocks the next plank (turns around, Lemmings-style).
-* A builder can be paused (right-click): it keeps its remaining planks and, once resumed,
-* starts a fresh staircase from wherever it stands.
-* The job comes from a Builder Crate (items/equipment.js) and starts paused; the empty kit is
-* dropped once the last plank has been laid.
+ * A builder can be paused (right-click): it keeps its remaining planks and, once resumed,
+ * starts a fresh staircase from wherever it stands.
+ * The job comes from a Builder Crate (items/equipment.js) and starts paused; the empty kit is
+ * dropped once the last plank has been laid.
  */
 export const BuilderRole = Object.freeze({
   name: 'builder',
@@ -37,21 +37,25 @@ export const BuilderRole = Object.freeze({
     troop.removeKit('builder');
   },
 
-
   update(troop, dt, sim) {
     const d = troop.roleData;
-    if (d.bricks <= 0) { this.finish(troop, sim); return true; } // resumed with nothing left to build
+    if (d.bricks <= 0) {
+      this.finish(troop, sim);
+      return true;
+    } // resumed with nothing left to build
     const { dx, dz } = troop.facing;
     const c = troop.cell;
     const world = sim.world;
     const brick = { x: c.x + dx, y: c.y, z: c.z + dz };
     const stand = { x: brick.x, y: brick.y + 1, z: brick.z };
 
-    if (!world.inBounds(brick.x, brick.y, brick.z) ||
-         !world.inBounds(stand.x, stand.y, stand.z) ||
-        world.isSolid(brick.x, brick.y, brick.z) ||
-        world.isSolid(stand.x, stand.y, stand.z) ||
-         sim.isBlocked(stand, troop.team)) {
+    if (
+      !world.inBounds(brick.x, brick.y, brick.z) ||
+      !world.inBounds(stand.x, stand.y, stand.z) ||
+      world.isSolid(brick.x, brick.y, brick.z) ||
+      world.isSolid(stand.x, stand.y, stand.z) ||
+      sim.isBlocked(stand, troop.team)
+    ) {
       troop.clearRole(sim);
       troop.dir = turnAround(troop.dir);
       return true;

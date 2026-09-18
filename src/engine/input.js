@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const CLICK_DRAG_THRESHOLD = 6; // px — anything further is an orbit/pan, not a click
-const WHEEL_NOTCH = 40;         // accumulated wheel pixels per rotation step (trackpads send many tiny deltas)
+const WHEEL_NOTCH = 40; // accumulated wheel pixels per rotation step (trackpads send many tiny deltas)
 
 /**
  * Mouse/keyboard input with raycasting into the voxel grid, instanced units and signs.
@@ -49,11 +49,19 @@ export class Input {
     dom.addEventListener('pointerleave', () => handlers.onHover?.(null));
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
     // Capture on the container so this runs before OrbitControls' zoom handler on the canvas.
-    renderer.container.addEventListener('wheel', (e) => this.onWheel(e), { capture: true, passive: false });
+    renderer.container.addEventListener('wheel', (e) => this.onWheel(e), {
+      capture: true,
+      passive: false,
+    });
     window.addEventListener('keydown', (e) => {
       const t = e.target;
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement ||
-          t instanceof HTMLSelectElement || t?.isContentEditable) return;
+      if (
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement ||
+        t?.isContentEditable
+      )
+        return;
       handlers.onKey?.(e);
     });
   }
@@ -83,7 +91,7 @@ export class Input {
     const rect = dom.getBoundingClientRect();
     this.ndc.set(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
     );
     this.raycaster.setFromCamera(this.ndc, this.renderer.camera);
     const hits = this.raycaster.intersectObjects(this.renderer.pickables(), false);
@@ -106,8 +114,16 @@ export class Input {
 
     const n = hit.face.normal; // chunk meshes are untransformed, so object space == world space
     const p = hit.point;
-    const cell = { x: Math.floor(p.x - n.x * 0.5), y: Math.floor(p.y - n.y * 0.5), z: Math.floor(p.z - n.z * 0.5) };
-    const adjacent = { x: Math.floor(p.x + n.x * 0.5), y: Math.floor(p.y + n.y * 0.5), z: Math.floor(p.z + n.z * 0.5) };
+    const cell = {
+      x: Math.floor(p.x - n.x * 0.5),
+      y: Math.floor(p.y - n.y * 0.5),
+      z: Math.floor(p.z - n.z * 0.5),
+    };
+    const adjacent = {
+      x: Math.floor(p.x + n.x * 0.5),
+      y: Math.floor(p.y + n.y * 0.5),
+      z: Math.floor(p.z + n.z * 0.5),
+    };
     return { type: 'voxel', cell, adjacent, normal: { x: n.x, y: n.y, z: n.z }, point: p };
   }
 
@@ -120,7 +136,8 @@ export class Input {
     const t = -ray.origin.y / ray.direction.y;
     if (t <= 0) return null;
     const p = ray.origin.clone().addScaledVector(ray.direction, t);
-    const x = Math.floor(p.x), z = Math.floor(p.z);
+    const x = Math.floor(p.x),
+      z = Math.floor(p.z);
     if (x < 0 || x >= world.w || z < 0 || z >= world.d) return null;
     return {
       type: 'voxel',

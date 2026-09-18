@@ -4,17 +4,76 @@ import { voxelInfo, isSolid, isClimbable } from './voxel.js';
 
 // Face table: outward normal, CCW vertex order (viewed from outside), and a flat shade factor.
 const FACES = [
-  { n: [1, 0, 0],  v: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]], shade: 0.82 },
-  { n: [-1, 0, 0], v: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]], shade: 0.7 },
-  { n: [0, 1, 0],  v: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], shade: 1.0 },
-  { n: [0, -1, 0], v: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], shade: 0.5 },
-  { n: [0, 0, 1],  v: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], shade: 0.78 },
-  { n: [0, 0, -1], v: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]], shade: 0.64 },
+  {
+    n: [1, 0, 0],
+    v: [
+      [1, 0, 0],
+      [1, 1, 0],
+      [1, 1, 1],
+      [1, 0, 1],
+    ],
+    shade: 0.82,
+  },
+  {
+    n: [-1, 0, 0],
+    v: [
+      [0, 0, 1],
+      [0, 1, 1],
+      [0, 1, 0],
+      [0, 0, 0],
+    ],
+    shade: 0.7,
+  },
+  {
+    n: [0, 1, 0],
+    v: [
+      [0, 1, 1],
+      [1, 1, 1],
+      [1, 1, 0],
+      [0, 1, 0],
+    ],
+    shade: 1.0,
+  },
+  {
+    n: [0, -1, 0],
+    v: [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 0, 1],
+      [0, 0, 1],
+    ],
+    shade: 0.5,
+  },
+  {
+    n: [0, 0, 1],
+    v: [
+      [0, 0, 1],
+      [1, 0, 1],
+      [1, 1, 1],
+      [0, 1, 1],
+    ],
+    shade: 0.78,
+  },
+  {
+    n: [0, 0, -1],
+    v: [
+      [1, 0, 0],
+      [0, 0, 0],
+      [0, 1, 0],
+      [1, 1, 0],
+    ],
+    shade: 0.64,
+  },
 ];
 
 // Ladders hug each solid side wall: [index of the face pointing at the wall, index of the face to draw].
-const LADDER_SIDES = [[0, 1], [1, 0], [4, 5], [5, 4]];
-const LADDER_INSET = 0.9;   // distance from the far side of the cell to the ladder plane
+const LADDER_SIDES = [
+  [0, 1],
+  [1, 0],
+  [4, 5],
+  [5, 4],
+];
+const LADDER_INSET = 0.9; // distance from the far side of the cell to the ladder plane
 const RAIL_WIDTH = 0.14;
 const RUNG_HEIGHT = 0.12;
 const RUNG_OFFSETS = [0.16, 0.46, 0.76];
@@ -32,7 +91,9 @@ export function buildChunkGeometry(world, cx, cy, cz) {
   const indices = [];
   const color = new THREE.Color();
 
-  const x0 = cx * CHUNK_SIZE, y0 = cy * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
+  const x0 = cx * CHUNK_SIZE,
+    y0 = cy * CHUNK_SIZE,
+    z0 = cz * CHUNK_SIZE;
   const x1 = Math.min(x0 + CHUNK_SIZE, world.w);
   const y1 = Math.min(y0 + CHUNK_SIZE, world.h);
   const z1 = Math.min(z0 + CHUNK_SIZE, world.d);

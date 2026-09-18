@@ -18,7 +18,13 @@ import { clampInt } from './generators/util.js';
 
 export { GENERATORS, DEFAULT_GENERATOR };
 // The reference generator's constants used to live in this file; keep them reachable from here.
-export { GENERATOR_LIMITS, AUTO_PARAMS, GENERATOR_DEFAULTS, SEGMENT_KINDS, autoParams } from './generators/siege.js';
+export {
+  GENERATOR_LIMITS,
+  AUTO_PARAMS,
+  GENERATOR_DEFAULTS,
+  SEGMENT_KINDS,
+  autoParams,
+} from './generators/siege.js';
 
 export const PARAM_TYPES = Object.freeze(['int', 'number', 'boolean', 'select', 'string']);
 
@@ -30,19 +36,24 @@ const validated = new WeakSet();
 function validateGenerator(gen) {
   if (validated.has(gen)) return gen;
   const name = gen && typeof gen.id === 'string' ? `"${gen.id}"` : '(unnamed)';
-  const fail = (msg) => { throw new Error(`Level generator ${name} is invalid: ${msg}`); };
+  const fail = (msg) => {
+    throw new Error(`Level generator ${name} is invalid: ${msg}`);
+  };
   if (!gen || typeof gen !== 'object') fail('not an object');
-  if (typeof gen.id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(gen.id)) fail('"id" must be a lower-case slug');
+  if (typeof gen.id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(gen.id))
+    fail('"id" must be a lower-case slug');
   if (typeof gen.label !== 'string' || !gen.label.trim()) fail('"label" is required');
   if (typeof gen.build !== 'function') fail('"build(params, ctx)" is required');
   if (!Array.isArray(gen.params)) fail('"params" must be an array of parameter definitions');
   const seen = new Set();
   for (const def of gen.params) {
-    if (!def || typeof def.key !== 'string' || !def.key) fail('every parameter needs a string "key"');
+    if (!def || typeof def.key !== 'string' || !def.key)
+      fail('every parameter needs a string "key"');
     if (def.key === 'id') fail('the parameter key "id" is reserved');
     if (seen.has(def.key)) fail(`duplicate parameter "${def.key}"`);
     seen.add(def.key);
-    if (!PARAM_TYPES.includes(def.type)) fail(`parameter "${def.key}" has unknown type "${def.type}"`);
+    if (!PARAM_TYPES.includes(def.type))
+      fail(`parameter "${def.key}" has unknown type "${def.type}"`);
     if (typeof def.label !== 'string') fail(`parameter "${def.key}" needs a "label"`);
     if (def.type === 'select' && !(Array.isArray(def.options) && def.options.length)) {
       fail(`select parameter "${def.key}" needs a non-empty "options" array`);
@@ -64,7 +75,10 @@ export function listGenerators() {
 export function getGenerator(ref = DEFAULT_GENERATOR) {
   if (ref && typeof ref === 'object') return validateGenerator(ref);
   const gen = GENERATORS[ref];
-  if (!gen) throw new Error(`Unknown level generator "${ref}" (available: ${Object.keys(GENERATORS).join(', ')})`);
+  if (!gen)
+    throw new Error(
+      `Unknown level generator "${ref}" (available: ${Object.keys(GENERATORS).join(', ')})`
+    );
   return validateGenerator(gen);
 }
 
@@ -82,10 +96,14 @@ function clampValue(def, v) {
 function fallback(def) {
   if (def.default !== undefined && def.default !== null) return clampValue(def, def.default);
   switch (def.type) {
-    case 'boolean': return false;
-    case 'select': return def.options[0].value;
-    case 'string': return '';
-    default: return clampValue(def, def.min ?? 0);
+    case 'boolean':
+      return false;
+    case 'select':
+      return def.options[0].value;
+    case 'string':
+      return '';
+    default:
+      return clampValue(def, def.min ?? 0);
   }
 }
 
@@ -149,7 +167,8 @@ export function buildLevel(generator, rawParams = {}) {
   const stored = normalizeParams(gen, rawParams);
   const resolved = resolveParams(gen, stored);
   const raw = gen.build(resolved, { generator: gen, stored });
-  if (!raw || typeof raw !== 'object') throw new Error(`Level generator "${gen.id}" did not return a level`);
+  if (!raw || typeof raw !== 'object')
+    throw new Error(`Level generator "${gen.id}" did not return a level`);
   const level = normalizeLevel(raw);
   level.generator = { id: gen.id, ...stored };
   return level;
@@ -170,8 +189,18 @@ export const CAMPAIGN_LENGTH = 12;
 export const CAMPAIGN_GENERATOR = 'siege';
 
 const CAMPAIGN_TITLES = [
-  'First Wall', 'Spike Row', 'The Trench', 'Twin Walls', 'Patrol Yard', 'Watchtower',
-  'Crossfire', 'The Gauntlet', "Grenadier's Keep", 'Long March', 'Broken Ground', 'Last Siege',
+  'First Wall',
+  'Spike Row',
+  'The Trench',
+  'Twin Walls',
+  'Patrol Yard',
+  'Watchtower',
+  'Crossfire',
+  'The Gauntlet',
+  "Grenadier's Keep",
+  'Long March',
+  'Broken Ground',
+  'Last Siege',
 ];
 
 /** Generator parameters of campaign level `index` (0-based): difficulty, length and width ramp up together. */
